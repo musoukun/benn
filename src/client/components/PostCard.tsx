@@ -89,10 +89,7 @@ export function PostCard({
       {urls.length > 0 && (
         <div className="post-url-cards">
           {urls.map((u) => (
-            <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="post-url-card">
-              <div className="post-url-card-host">🔗 {safeHost(u)}</div>
-              <div className="post-url-card-url">{u}</div>
-            </a>
+            <OgpUrlCard key={u} url={u} />
           ))}
         </div>
       )}
@@ -127,4 +124,67 @@ function safeHost(url: string): string {
   } catch {
     return url;
   }
+}
+
+// OGP を非同期取得して URL カードを装飾。失敗時は素朴な host だけ表示。
+function OgpUrlCard({ url }: { url: string }) {
+  const [data, setData] = React.useState<{
+    title: string | null;
+    description: string | null;
+    image: string | null;
+    host: string;
+    siteName: string | null;
+  } | null>(null);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api
+      .fetchOgp(url)
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  if (failed || (data && !data.title && !data.image)) {
+    // 取れなかった: ホストだけのシンプルカード
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="post-url-card simple">
+        <div className="post-url-card-host">🔗 {data?.host || safeHost(url)}</div>
+        <div className="post-url-card-url">{url}</div>
+      </a>
+    );
+  }
+  if (!data) {
+    // 取得中
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="post-url-card loading">
+        <div className="post-url-card-host">🔗 {safeHost(url)}</div>
+        <div className="post-url-card-url" style={{ opacity: 0.5 }}>読み込み中…</div>
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="post-url-card rich">
+      {data.image && (
+        <div
+          className="post-url-card-image"
+          style={{ backgroundImage: `url(${JSON.stringify(data.image).slice(1, -1)})` }}
+        />
+      )}
+      <div className="post-url-card-text">
+        <div className="post-url-card-host">{data.siteName || data.host}</div>
+        {data.title && <div className="post-url-card-title">{data.title}</div>}
+        {data.description && <div className="post-url-card-desc">{data.description}</div>}
+      </div>
+    </a>
+  );
 }

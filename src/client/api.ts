@@ -207,6 +207,17 @@ export const api = {
   togglePostLike: (id: string) =>
     req<{ liked: boolean; count: number }>(`/posts/${id}/like`, { method: 'POST' }),
 
+  // ---------- OGP ----------
+  fetchOgp: (url: string) =>
+    req<{
+      url: string;
+      host: string;
+      title: string | null;
+      description: string | null;
+      image: string | null;
+      siteName: string | null;
+    }>('/ogp?url=' + encodeURIComponent(url)),
+
   // ---------- Notifications ----------
   listNotifications: (kind?: 'all' | 'comment') =>
     req<Notification[]>('/notifications' + (kind && kind !== 'all' ? '?kind=' + kind : '')),

@@ -31,6 +31,13 @@ export default defineConfig(({ mode }) => {
         injectClientScript: false,
       }),
     ],
+    // @resvg/resvg-js の native .node bindings は esbuild が読めないので external 化
+    ssr: {
+      external: ['@resvg/resvg-js'],
+    },
+    optimizeDeps: {
+      exclude: ['@resvg/resvg-js'],
+    },
     build: {
       outDir: 'dist/server',
       emptyOutDir: true,

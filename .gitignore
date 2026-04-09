@@ -11,3 +11,6 @@ doc/
 template-agenta-main
 test-results/
 screenshots*
+# OGP 用の Noto Sans CJK は 17MB と巨大なので git に入れない。
+# 起動時にチェック → 欠損時はエラー + ダウンロード手順を表示。
+assets/fonts/

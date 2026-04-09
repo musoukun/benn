@@ -12,6 +12,7 @@ import { aggregationRoutes } from './routes-aggregation';
 import { postRoutes } from './routes-posts';
 import { commentRoutes } from './routes-comments';
 import { notificationRoutes } from './routes-notifications';
+import { ogpRoutes } from './routes-ogp';
 import { notify, unnotify } from './notify';
 
 export const api = new Hono<{ Variables: { user: User | null } }>();
@@ -24,6 +25,7 @@ api.route('/aggregation', aggregationRoutes);
 api.route('/posts', postRoutes);
 api.route('/comments', commentRoutes);
 api.route('/notifications', notificationRoutes);
+api.route('/ogp', ogpRoutes);
 
 // ---------- file uploads (画像/GIF) ----------
 

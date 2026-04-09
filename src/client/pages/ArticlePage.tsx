@@ -5,6 +5,7 @@ import type { ArticleFull, User } from '../types';
 import { Avatar } from '../components/Avatar';
 import { CommentSection } from '../components/CommentSection';
 import { renderMd } from '../markdown';
+import { useOgMeta } from '../useOgMeta';
 
 export function ArticlePage() {
   const { id = '' } = useParams();
@@ -59,6 +60,13 @@ export function ArticlePage() {
     if (!confirm('この記事を削除しますか？')) return;
     api.deleteArticle(id).then(() => nav('/'));
   }, [id, nav]);
+
+  // OGP meta: 動的 OGP 画像 /api/ogp/articles/:id.png を埋める
+  useOgMeta({
+    title: a?.title,
+    description: (a?.body || '').slice(0, 140),
+    image: a ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/ogp/articles/${a.id}/image` : undefined,
+  });
 
   if (loading) return <div className="container"><div className="loading">読み込み中…</div></div>;
   if (!a) {
