@@ -231,17 +231,17 @@ async function renderOgpPng(opts: {
                 type: 'div',
                 props: {
                   style: {
-                    width: 64,
-                    height: 64,
-                    borderRadius: 999,
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36, // 半径=サイズ/2 で完全な円。Satori は '50%' より数値の方が安定
                     background: '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 32,
+                    fontSize: 36,
                     fontWeight: 800,
                     color: '#5fcfdc',
-                    border: '2px solid #5fcfdc',
+                    border: '3px solid #5fcfdc',
                   },
                   children: (opts.authorName || '?').slice(0, 1).toUpperCase(),
                 },

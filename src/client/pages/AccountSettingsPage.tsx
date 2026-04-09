@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Affiliation, AIConfig } from '../types';
-import { AvatarSection } from '../components/AvatarSection';
+import { ProfileEditor } from '../components/ProfileEditor';
 
 type Tab = 'profile' | 'affiliation' | 'ai' | 'prompts';
 
@@ -17,7 +17,7 @@ export function AccountSettingsPage() {
         <button className={tab === 'ai' ? 'active' : ''} onClick={() => setTab('ai')}>AIプロバイダ</button>
         <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>プロンプト</button>
       </div>
-      {tab === 'profile' && <AvatarSection />}
+      {tab === 'profile' && <ProfileEditor />}
       {tab === 'affiliation' && <AffiliationSection />}
       {tab === 'ai' && <AIConfigSection />}
       {tab === 'prompts' && <PromptSection />}

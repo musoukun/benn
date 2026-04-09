@@ -1,22 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { registerAndLogin } from './helpers';
 
-test('エディタのスクロール同期トグルが動く', async ({ page }) => {
+test('エディタのスクロール同期トグルが動く (preview-sync-toggle)', async ({ page }) => {
   await registerAndLogin(page, 'sync');
   await page.goto('/editor');
 
-  const toggle = page.getByRole('button', { name: /同期/ });
+  const toggle = page.locator('.preview-sync-toggle');
   await expect(toggle).toBeVisible();
-  // デフォルトは ON
-  await expect(toggle).toContainText(/同期ON/);
+  // デフォルトは ON (.on クラス)
+  await expect(toggle).toHaveClass(/\bon\b/);
 
   await toggle.click();
-  await expect(toggle).toContainText(/同期OFF/);
+  await expect(toggle).not.toHaveClass(/\bon\b/);
 
-  // localStorage に永続化されること
+  // localStorage に永続化される
   const stored = await page.evaluate(() => localStorage.getItem('uchi:scrollSync'));
   expect(stored).toBe('0');
 
   await toggle.click();
-  await expect(toggle).toContainText(/同期ON/);
+  await expect(toggle).toHaveClass(/\bon\b/);
 });

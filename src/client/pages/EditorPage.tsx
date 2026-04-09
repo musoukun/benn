@@ -4,6 +4,9 @@ import { api } from '../api';
 import { renderMd } from '../markdown';
 import { TagInput } from '../components/TagInput';
 import { AIReviewSidebar } from '../components/AIReviewSidebar';
+import { BotIcon } from '../components/BotIcon';
+import { PublishPanel } from '../components/PublishPanel';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import type { Affiliation, CommunitySummary, CommunityFull } from '../types';
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -29,6 +32,9 @@ export function EditorPage() {
   const [allAffiliations, setAllAffiliations] = useState<Affiliation[]>([]);
   const [myCommunities, setMyCommunities] = useState<CommunitySummary[]>([]);
   const [communityDetail, setCommunityDetail] = useState<CommunityFull | null>(null);
+  const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
+  const [publishPanelOpen, setPublishPanelOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   useEffect(() => {
     api.listAffiliations().then(setAllAffiliations).catch(() => {});
@@ -262,64 +268,15 @@ export function EditorPage() {
   return (
     <div className="container-wide">
       <div className="editor-toolbar">
-        <input
-          type="text"
-          style={{ width: 60, textAlign: 'center', fontSize: 24 }}
-          value={emoji}
-          onChange={(e) => setEmoji(e.target.value)}
-        />
-        <div
-          style={{
-            display: 'inline-flex',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            overflow: 'hidden',
-          }}
-        >
-          <button
-            type="button"
-            style={{
-              padding: '8px 16px',
-              border: 0,
-              background: type === 'tech' ? 'var(--tech)' : '#fff',
-              color: type === 'tech' ? '#fff' : 'var(--muted)',
-              fontWeight: 700,
-            }}
-            onClick={() => setType('tech')}
-          >
-            Tech
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: '8px 16px',
-              border: 0,
-              borderLeft: '1px solid var(--border)',
-              background: type === 'idea' ? 'var(--idea)' : '#fff',
-              color: type === 'idea' ? '#fff' : 'var(--muted)',
-              fontWeight: 700,
-            }}
-            onClick={() => setType('idea')}
-          >
-            Idea
-          </button>
-        </div>
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <TagInput
-            value={topics}
-            onChange={setTopics}
-            max={5}
-            placeholder="タグを入力してTab/Enter (最大5)"
-          />
-        </div>
+        <div style={{ flex: 1 }} />
         <button
           type="button"
           className="btn btn-ghost"
           disabled={uploading}
           onClick={onPickFile}
-          title="画像/GIFを挿入 (最大50MB)"
+          title="画像/GIFを添付 (最大50MB)"
         >
-          {uploading ? 'アップロード中…' : '🖼 画像'}
+          {uploading ? 'アップロード中…' : '🖼 画像を添付'}
         </button>
         <input
           ref={fileInputRef}
@@ -330,26 +287,44 @@ export function EditorPage() {
         />
         <button
           type="button"
-          className={'btn btn-ghost' + (scrollSync ? ' on' : '')}
-          onClick={() => setScrollSync((v) => !v)}
-          title="編集とプレビューを連動スクロール"
+          className="btn btn-ghost btn-with-icon"
+          onClick={() => setAiSidebarOpen(true)}
+          title="AIによる添削レビューを開く"
+          disabled={!id}
         >
-          {scrollSync ? '🔗 同期ON' : '🔗 同期OFF'}
+          <BotIcon size={16} />
+          <span>AI添削</span>
         </button>
         <button className="btn btn-ghost" disabled={saving} onClick={() => save(false)}>
           下書き保存
         </button>
-        <button className="btn" disabled={saving} onClick={() => save(true)}>
+        <button
+          className="btn"
+          disabled={saving}
+          onClick={() => setPublishPanelOpen(true)}
+        >
           {saving ? '保存中…' : '公開する'}
         </button>
       </div>
-      <input
-        className="title-input"
-        aria-label="記事タイトル"
-        placeholder="タイトル (必須)"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
+      <div className="editor-title-row">
+        <input
+          className="title-input"
+          aria-label="記事タイトル"
+          placeholder="タイトル (必須)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        {id && (
+          <button
+            type="button"
+            className="editor-delete-btn"
+            onClick={() => setDeleteConfirm(true)}
+            title="この記事を削除"
+          >
+            🗑 削除
+          </button>
+        )}
+      </div>
       <details style={{ marginBottom: 12 }} open={!!communityId}>
         <summary style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 13 }}>公開オプション (公開範囲 / 予約公開 / コミュニティ)</summary>
         <div style={{ padding: 12, background: 'var(--accent-soft-10)', border: '1px dashed rgba(95,207,220,.4)', borderRadius: 8, marginTop: 8, display: 'grid', gap: 12 }}>
@@ -377,16 +352,6 @@ export function EditorPage() {
                 ))}
               </div>
             )}
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>予約公開</label>
-            <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid var(--border)' }}
-            />
-            {scheduledAt && <button type="button" className="btn btn-ghost" onClick={() => setScheduledAt('')} style={{ marginLeft: 8 }}>クリア</button>}
           </div>
           <div>
             <label style={{ fontWeight: 700, fontSize: 13 }}>コミュニティに投稿</label>
@@ -427,15 +392,82 @@ export function EditorPage() {
             onScroll={onEditorScroll}
           />
         </div>
-        <div
-          ref={previewRef}
-          className="preview-pane md"
-          onScroll={onPreviewScroll}
-          dangerouslySetInnerHTML={{ __html: renderMd(body) }}
-        />
+        <div className="preview-pane-wrap">
+          {/* 同期スクロール トグル (プレビュー上部の小さな丸ボタン) */}
+          <button
+            type="button"
+            className={'preview-sync-toggle' + (scrollSync ? ' on' : '')}
+            onClick={() => setScrollSync((v) => !v)}
+            title={scrollSync ? '同期スクロール: ON' : '同期スクロール: OFF'}
+            aria-label="同期スクロール トグル"
+          >
+            🔗
+          </button>
+          <div
+            ref={previewRef}
+            className="preview-pane md"
+            onScroll={onPreviewScroll}
+            dangerouslySetInnerHTML={{ __html: renderMd(body) }}
+          />
+        </div>
       </div>
-      {/* AI レビューは右サイドバー (折りたたみ可能) */}
-      <AIReviewSidebar articleId={id || null} body={body} />
+      {/* AI レビューは左サイドバー (折りたたみ可能) */}
+      <AIReviewSidebar
+        articleId={id || null}
+        body={body}
+        open={aiSidebarOpen}
+        onOpenChange={setAiSidebarOpen}
+        onApplyLineFix={(line, newText) => {
+          setBody((b) => {
+            const lines = b.split('\n');
+            if (line < 1 || line > lines.length) return b;
+            lines[line - 1] = newText;
+            return lines.join('\n');
+          });
+        }}
+        onAppendBody={(text) => {
+          setBody((b) => (b.endsWith('\n') ? b + '\n' + text + '\n' : b + '\n\n' + text + '\n'));
+        }}
+      />
+      {/* 削除 確認モーダル (はい/いいえ) */}
+      <ConfirmDialog
+        open={deleteConfirm}
+        title="記事を削除しますか？"
+        message="この操作は取り消せません。本当に削除しますか?"
+        yesLabel="はい (削除)"
+        noLabel="いいえ"
+        yesDanger
+        onNo={() => setDeleteConfirm(false)}
+        onYes={async () => {
+          if (!id) return;
+          try {
+            await api.deleteArticle(id);
+            setDeleteConfirm(false);
+            nav('/');
+          } catch (e: any) {
+            alert('削除失敗: ' + e.message);
+          }
+        }}
+      />
+      {/* Zenn 風の公開設定パネル (右からスライドイン) */}
+      <PublishPanel
+        open={publishPanelOpen}
+        onClose={() => setPublishPanelOpen(false)}
+        isEdit={!!id}
+        emoji={emoji}
+        setEmoji={setEmoji}
+        type={type}
+        setType={setType}
+        topics={topics}
+        setTopics={setTopics}
+        scheduledAt={scheduledAt}
+        setScheduledAt={setScheduledAt}
+        saving={saving}
+        onPublish={async () => {
+          await save(true);
+          setPublishPanelOpen(false);
+        }}
+      />
     </div>
   );
 }

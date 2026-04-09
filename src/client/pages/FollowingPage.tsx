@@ -52,7 +52,9 @@ export function FollowingPage() {
           プロフィールやトピックページから Follow してみよう。
         </div>
       ) : (
-        items.map((a) => <ArticleCard key={a.id} a={a} />)
+        <div className="articles-grid">
+          {items.map((a) => <ArticleCard key={a.id} a={a} />)}
+        </div>
       )}
     </div>
   );

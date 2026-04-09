@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Avatar } from './Avatar';
 import { useMe, setMe } from '../useMe';
@@ -9,12 +9,26 @@ export function Header() {
   const me = useMe();
   const nav = useNavigate();
   const [q, setQ] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const onLogout = async () => {
+    setMenuOpen(false);
     await api.logout().catch(() => {});
     setMe(null);
     nav('/login');
   };
+
+  // クリックアウトで閉じる
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [menuOpen]);
 
   return (
     <header className="header">
@@ -62,18 +76,64 @@ export function Header() {
               ✨要約
             </NavLink>
             <NavLink to="/me/aggregate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              🪡記事まとめ作成
-            </NavLink>
-            <NavLink to="/me/settings" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              ⚙設定
+              🪡まとめ作製
             </NavLink>
             <NotificationBell />
-            <Link to={`/users/${me.id}`}>
-              <Avatar user={me} />
-            </Link>
-            <button className="btn btn-ghost" onClick={onLogout} style={{ padding: '6px 12px' }}>
-              ログアウト
-            </button>
+            {/* アバター → プルダウンメニュー */}
+            <div className="account-menu" ref={menuRef}>
+              <button
+                className="account-menu-trigger"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="アカウントメニュー"
+              >
+                <Avatar user={me} />
+              </button>
+              {menuOpen && (
+                <div className="account-menu-panel">
+                  {/* 上部: 自分のアカウント情報 (クリックでプロフィール) */}
+                  <Link
+                    to={`/users/${me.id}`}
+                    className="account-menu-header"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Avatar user={me} />
+                    <div className="account-menu-id">
+                      <div className="account-menu-name">{me.name}</div>
+                      <div className="account-menu-email">{me.email || ''}</div>
+                    </div>
+                  </Link>
+                  <div className="account-menu-divider" />
+                  <Link
+                    to={`/users/${me.id}`}
+                    className="account-menu-item"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    👤 プロフィール
+                  </Link>
+                  <Link
+                    to="/me/drafts"
+                    className="account-menu-item"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    📝 自分の投稿
+                  </Link>
+                  <Link
+                    to="/me/settings"
+                    className="account-menu-item"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    ⚙ 設定
+                  </Link>
+                  <div className="account-menu-divider" />
+                  <button
+                    className="account-menu-item account-menu-logout"
+                    onClick={onLogout}
+                  >
+                    🚪 ログアウト
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <>

@@ -164,6 +164,96 @@ aiRoutes.post('/articles/:id/review', requireAuth, async (c) => {
   return c.json({ id: saved.id, ...parsed });
 });
 
+// 行コメント / 改善点に基づいて、具体的な置換テキストや追記テキストを生成
+// mode='line': 指定された行の置換テキストを生成 (L行 を新しい1〜数行で置き換える)
+// mode='append': 改善点に基づき、記事末尾に追記する markdown 段落を生成
+aiRoutes.post('/articles/:id/suggest', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const id = c.req.param('id');
+  const a = await prisma.article.findUnique({ where: { id } });
+  if (!a) return c.json({ error: 'not found' }, 404);
+  if (a.authorId !== me.id) return c.json({ error: 'forbidden' }, 403);
+
+  const { mode, line, instruction } = await c.req.json<{
+    mode: 'line' | 'append';
+    line?: number;
+    instruction: string;
+  }>();
+
+  if (mode !== 'line' && mode !== 'append')
+    return c.json({ error: 'invalid mode' }, 400);
+  if (!instruction || !instruction.trim())
+    return c.json({ error: 'instruction required' }, 400);
+
+  const lines = a.body.split('\n');
+  let system: string;
+  let user: string;
+
+  if (mode === 'line') {
+    if (!line || line < 1 || line > lines.length)
+      return c.json({ error: 'invalid line' }, 400);
+    const target = lines[line - 1];
+    // 前後 2 行ずつのコンテキスト
+    const ctxBefore = lines.slice(Math.max(0, line - 3), line - 1).join('\n');
+    const ctxAfter = lines.slice(line, Math.min(lines.length, line + 2)).join('\n');
+
+    system = [
+      'あなたは技術記事の編集アシスタントです。',
+      'ユーザーが指定した1行の Markdown を、レビューコメントに従って改善した形に書き換えてください。',
+      '出力ルール:',
+      '- 説明やコメントは一切書かず、置換後のテキストだけを出力する',
+      '- 1行を複数行に拡張してもよいが、文脈と整合させる',
+      '- コードフェンス ```...``` で囲まない',
+      '- Markdown 構文 (# 見出し, [text](url) リンク等) を活用する',
+      '- 元のテキストの意味/トピックを保持する',
+    ].join('\n');
+    user = [
+      `# 記事タイトル: ${a.title}`,
+      '',
+      '## 前後のコンテキスト',
+      ctxBefore && `(L${line - 2}〜L${line - 1}):\n${ctxBefore}`,
+      `(L${line} ← 置換対象):\n${target}`,
+      ctxAfter && `(L${line + 1}〜):\n${ctxAfter}`,
+      '',
+      '## レビュアーからの指示',
+      instruction,
+      '',
+      '## 出力',
+      `L${line} を置換するテキストを出力してください。`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  } else {
+    // append
+    system = [
+      'あなたは技術記事の編集アシスタントです。',
+      'ユーザーが指定した改善点に基づき、記事に追記する Markdown 段落を生成してください。',
+      '出力ルール:',
+      '- 説明やコメントは一切書かず、追記する Markdown 本文だけを出力する',
+      '- コードフェンス ```...``` で全体を囲まない (内部のコードブロックは可)',
+      '- 既存記事の文体・トピックと整合させる',
+      '- 必要なら適切な見出し (## や ###) を含めてもよい',
+    ].join('\n');
+    user = [
+      `# 記事タイトル: ${a.title}`,
+      '',
+      '## 既存の記事本文 (抜粋)',
+      a.body.slice(0, 4000),
+      '',
+      '## 改善点',
+      instruction,
+      '',
+      '## 出力',
+      '記事末尾に追記する Markdown を出力してください。',
+    ].join('\n');
+  }
+
+  const raw = await callLLM(me.id, { system, user, maxTokens: 1500 });
+  // 余分なコードフェンスを除去
+  const text = raw.replace(/^```(?:markdown|md)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+  return c.json({ text });
+});
+
 aiRoutes.get('/articles/:id/reviews', async (c) => {
   const id = c.req.param('id');
   const items = await prisma.articleReview.findMany({

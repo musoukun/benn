@@ -97,11 +97,15 @@ aggregationRoutes.post('/render', requireAuth, async (c) => {
     }
   }
 
+  // 記事 URL は origin 付きの絶対 URL にして、必ずクリック可能な
+  // Markdown リンクとして出力する。タイトル自体をリンクに。
+  const origin = c.req.header('origin') || c.req.header('host') ? `${c.req.header('origin') || 'http://' + c.req.header('host')}` : '';
   const blocks = ordered
     .map((a) => {
-      const url = `/articles/${a.id}`;
+      const url = `${origin}/articles/${a.id}`;
       const summary = summaries.get(a.id);
-      return `# ${a.title}\n${url}\n${summary ? '\n' + summary + '\n' : ''}`;
+      // 例: ## [タイトル](https://example.com/articles/xxx)
+      return `## [${a.title}](${url})\n${summary ? '\n' + summary + '\n' : ''}`;
     })
     .join('\n');
 

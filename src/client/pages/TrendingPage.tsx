@@ -42,7 +42,9 @@ export function TrendingPage() {
           記事を投稿していいねを集めてみよう！
         </div>
       ) : (
-        items.map((a) => <ArticleCard key={a.id} a={a} />)
+        <div className="articles-grid">
+          {items.map((a) => <ArticleCard key={a.id} a={a} />)}
+        </div>
       )}
     </div>
   );

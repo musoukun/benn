@@ -7,6 +7,16 @@ export type User = {
   createdAt?: string;
 };
 
+export type UserProfile = User & {
+  affiliations?: Affiliation[];
+  stats?: {
+    articleCount: number;
+    postCount: number;
+    followerCount: number;
+    followingCount: number;
+  };
+};
+
 export type Topic = {
   id: string;
   name: string;

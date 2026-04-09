@@ -57,7 +57,8 @@ export const api = {
   getMe: () => req<User | null>('/me'),
   updateMe: (patch: { name?: string; bio?: string; avatarUrl?: string }) =>
     req<User>('/me', { method: 'PATCH', body: JSON.stringify(patch) }),
-  getUser: (id: string) => req<User>(`/users/${id}`),
+  getUser: (id: string) => req<import('./types').UserProfile>(`/users/${id}`),
+  getUserPosts: (id: string) => req<import('./types').Post[]>(`/users/${id}/posts`),
 
   // topics
   listTopics: () => req<Topic[]>('/topics'),
@@ -261,6 +262,14 @@ export const api = {
   reviewArticle: (id: string) =>
     req<AIReview>(`/ai/articles/${id}/review`, { method: 'POST' }),
   listReviews: (id: string) => req<AIReview[]>(`/ai/articles/${id}/reviews`),
+  suggestFix: (
+    id: string,
+    payload: { mode: 'line' | 'append'; line?: number; instruction: string }
+  ) =>
+    req<{ text: string }>(`/ai/articles/${id}/suggest`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   summarize: (articleIds: string[], customPrompt?: string) =>
     req<{ items: { id: string; title: string; url: string; summary: string }[] }>('/ai/summarize', {
       method: 'POST',

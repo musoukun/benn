@@ -188,9 +188,92 @@ api.patch('/me', requireAuth, async (c) => {
 
 api.get('/users/:id', async (c) => {
   const id = c.req.param('id');
-  const u = await prisma.user.findUnique({ where: { id } });
+  const u = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      affiliations: { include: { affiliation: true } },
+    },
+  });
   if (!u) return c.json({ error: 'not found' }, 404);
-  return c.json(safeUser(u));
+  // 統計情報 (記事数 / SNS投稿数 / フォロワー数 / フォロー中数)
+  const [articleCount, postCount, followerCount, followingCount] = await Promise.all([
+    prisma.article.count({ where: { authorId: id, published: true, approvalStatus: 'approved' } }),
+    prisma.post.count({ where: { authorId: id, approvalStatus: 'approved', parentPostId: null } }),
+    prisma.follow.count({ where: { targetType: 'user', targetId: id } }),
+    prisma.follow.count({ where: { userId: id, targetType: 'user' } }),
+  ]);
+  const { passwordHash, affiliations, ...rest } = u as any;
+  return c.json({
+    ...rest,
+    affiliations: (affiliations as any[]).map((a) => ({
+      id: a.affiliation.id,
+      name: a.affiliation.name,
+      slug: a.affiliation.slug,
+    })),
+    stats: { articleCount, postCount, followerCount, followingCount },
+  });
+});
+
+// ユーザーの SNS 投稿一覧 (公開コミュニティのみ)
+api.get('/users/:id/posts', async (c) => {
+  const id = c.req.param('id');
+  const me = c.get('user');
+  const limit = Math.min(parseInt(c.req.query('limit') || '30', 10) || 30, 100);
+
+  const posts = await prisma.post.findMany({
+    where: {
+      authorId: id,
+      approvalStatus: 'approved',
+      parentPostId: null,
+      // private community の投稿はメンバーのみ閲覧可
+      OR: [
+        { communityId: null },
+        { community: { visibility: 'public' } },
+        ...(me
+          ? [
+              {
+                community: {
+                  visibility: 'private' as any,
+                  members: { some: { userId: me.id } },
+                },
+              },
+            ]
+          : []),
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: {
+      author: { select: { id: true, name: true, avatarUrl: true } },
+      _count: { select: { likes: true, comments: true } },
+    },
+  });
+
+  let likedSet = new Set<string>();
+  if (me) {
+    const liked = await prisma.postLike.findMany({
+      where: { userId: me.id, postId: { in: posts.map((p) => p.id) } },
+      select: { postId: true },
+    });
+    likedSet = new Set(liked.map((l) => l.postId));
+  }
+
+  return c.json(
+    posts.map((p: any) => ({
+      id: p.id,
+      body: p.body,
+      authorId: p.authorId,
+      author: p.author,
+      communityId: p.communityId,
+      timelineId: p.timelineId,
+      parentPostId: p.parentPostId,
+      likeCount: p._count?.likes ?? 0,
+      commentCount: p._count?.comments ?? 0,
+      likedByMe: likedSet.has(p.id),
+      isMine: me ? p.authorId === me.id : false,
+      createdAt: p.createdAt,
+    }))
+  );
 });
 
 // ---------- topics ----------

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { Avatar } from './Avatar';
+import { setMe as setGlobalMe } from '../useMe';
 
 // シンプルなクライアント側の正方形クロップ:
 // - file 選択 → Image 化
@@ -10,8 +11,20 @@ import { Avatar } from './Avatar';
 const OUTPUT_SIZE = 512;
 const PREVIEW_SIZE = 320;
 
-export function AvatarSection() {
+// controlled モード:
+//   onPendingFile が指定されているとき, クロップ完了 / 絵文字確定で
+//   API を呼ばずに親に File を渡す。親が「保存」ボタンで一括 commit する想定。
+//   uncontrolled (default) 動作は従来通り即時 API 反映。
+export function AvatarSection({
+  onPendingFile,
+  bare,
+}: {
+  onPendingFile?: (file: File) => void;
+  bare?: boolean; // true なら外側の card / h3 を出さず、フラグメント風に描画
+} = {}) {
+  const controlled = !!onPendingFile;
   const [me, setMe] = useState<{ id: string; name: string; avatarUrl: string | null } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // controlled 時の確定済みプレビュー
   const [emoji, setEmoji] = useState('');
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -125,11 +138,21 @@ export function AvatarSection() {
         out.toBlob((b) => resolve(b!), 'image/png')
       );
       const file = new File([blob], 'avatar.png', { type: 'image/png' });
-      const up = await api.uploadFile(file);
-      await api.updateMe({ avatarUrl: up.url });
-      setMe((prev) => (prev ? { ...prev, avatarUrl: up.url } : prev));
-      setImg(null);
-      setMsg('アバターを更新しました');
+      if (controlled) {
+        // 親に File を渡して、自前ではプレビューを更新するだけ
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+        onPendingFile!(file);
+        setImg(null);
+        setMsg('画像を確定しました (保存ボタンで反映)');
+      } else {
+        const up = await api.uploadFile(file);
+        const updated = await api.updateMe({ avatarUrl: up.url });
+        setMe((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+        setGlobalMe(updated); // ヘッダー等の Avatar を即時更新
+        setImg(null);
+        setMsg('アバターを更新しました');
+      }
     } catch (e: any) {
       setMsg('失敗: ' + (e?.message || e));
     } finally {
@@ -161,11 +184,20 @@ export function AvatarSection() {
         cv.toBlob((b) => resolve(b!), 'image/png')
       );
       const file = new File([blob], 'avatar-emoji.png', { type: 'image/png' });
-      const up = await api.uploadFile(file);
-      await api.updateMe({ avatarUrl: up.url });
-      setMe((prev) => (prev ? { ...prev, avatarUrl: up.url } : prev));
-      setMsg('絵文字アバターを設定しました');
-      setEmoji('');
+      if (controlled) {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+        onPendingFile!(file);
+        setMsg('絵文字を確定しました (保存ボタンで反映)');
+        setEmoji('');
+      } else {
+        const up = await api.uploadFile(file);
+        const updated = await api.updateMe({ avatarUrl: up.url });
+        setMe((prev) => (prev ? { ...prev, avatarUrl: updated.avatarUrl } : prev));
+        setGlobalMe(updated); // ヘッダー等の Avatar を即時更新
+        setMsg('絵文字アバターを設定しました');
+        setEmoji('');
+      }
     } catch (e: any) {
       setMsg('失敗: ' + (e?.message || e));
     } finally {
@@ -173,15 +205,17 @@ export function AvatarSection() {
     }
   };
 
-  return (
-    <div className="card">
-      <h3 style={{ marginTop: 0 }}>プロフィール画像</h3>
-      {me && (
+  const inner = (
+    <>
+      {!bare && <h3 style={{ marginTop: 0 }}>プロフィール画像</h3>}
+      {me && !bare && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16 }}>
-          <Avatar user={me} />
+          <Avatar user={{ ...me, avatarUrl: previewUrl || me.avatarUrl }} size="lg" />
           <div>
             <div style={{ fontWeight: 700 }}>{me.name}</div>
-            <div style={{ color: 'var(--muted)', fontSize: 12 }}>現在のアバター</div>
+            <div style={{ color: 'var(--muted)', fontSize: 12 }}>
+              {previewUrl ? '確定済み (保存ボタンで反映)' : '現在のアバター'}
+            </div>
           </div>
         </div>
       )}
@@ -243,6 +277,7 @@ export function AvatarSection() {
         </div>
       )}
       {msg && <div style={{ marginTop: 12, color: 'var(--accent)' }}>{msg}</div>}
-    </div>
+    </>
   );
+  return bare ? inner : <div className="card">{inner}</div>;
 }

@@ -14,6 +14,8 @@ export function AggregatePage() {
   const [includeSummary, setIncludeSummary] = useState(false);
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     api.listAggTemplates().then(setTemplates);
@@ -23,8 +25,9 @@ export function AggregatePage() {
   const reloadTpl = () => api.listAggTemplates().then(setTemplates);
 
   const search = async () => {
-    const r = await api.listArticles({ q, limit: 50 });
+    const r = await api.listArticles({ q, limit: 200 });
     setArticles(r);
+    setPage(0);
   };
 
   const toggle = (id: string) => {
@@ -76,7 +79,7 @@ export function AggregatePage() {
 
   return (
     <div className="container">
-      <h2 style={{ marginTop: 0 }}>記事まとめ作成</h2>
+      <h2 style={{ marginTop: 0 }}>まとめ作製</h2>
       <p style={{ color: 'var(--muted)', fontSize: 13 }}>複数の記事を1つのまとめ記事にします。テンプレート内の <code>{'{{articles}}'}</code> が記事ブロックに置換されます。</p>
 
       <div className="card" style={{ marginBottom: 12 }}>
@@ -111,17 +114,76 @@ export function AggregatePage() {
             style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 6, flex: 1 }}
           />
           <button className="btn" onClick={search}>検索</button>
-          <button className="btn btn-ghost" onClick={() => api.myBookmarks().then(setArticles)}>ブックマーク</button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              api.myBookmarks().then(setArticles);
+              setPage(0);
+            }}
+          >
+            ブックマーク
+          </button>
         </div>
-        {articles.map((a) => (
-          <div key={a.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
-            <input type="checkbox" checked={picked.has(a.id)} onChange={() => toggle(a.id)} />
-            <span style={{ fontSize: 18 }}>{a.emoji || '📝'}</span>
-            <span style={{ flex: 1 }}>{a.title}</span>
-          </div>
-        ))}
+
+        {(() => {
+          const totalPages = Math.max(1, Math.ceil(articles.length / PAGE_SIZE));
+          const safePage = Math.min(page, totalPages - 1);
+          const visible = articles.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+          return (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+                {articles.length} 件中 {safePage * PAGE_SIZE + 1}〜
+                {Math.min(articles.length, safePage * PAGE_SIZE + PAGE_SIZE)} 件
+                ・選択中 {picked.size} 件
+              </div>
+              {visible.map((a) => (
+                <div
+                  key={a.id}
+                  style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={picked.has(a.id)}
+                    onChange={() => toggle(a.id)}
+                  />
+                  <span style={{ fontSize: 18 }}>{a.emoji || '📝'}</span>
+                  <span style={{ flex: 1 }}>{a.title}</span>
+                </div>
+              ))}
+              {articles.length === 0 && (
+                <div style={{ color: 'var(--muted)', padding: 12 }}>候補がありません</div>
+              )}
+              {totalPages > 1 && (
+                <div className="agg-pagination">
+                  <button
+                    className="btn btn-ghost"
+                    disabled={safePage === 0}
+                    onClick={() => setPage(safePage - 1)}
+                  >
+                    « 前
+                  </button>
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    {safePage + 1} / {totalPages}
+                  </span>
+                  <button
+                    className="btn btn-ghost"
+                    disabled={safePage >= totalPages - 1}
+                    onClick={() => setPage(safePage + 1)}
+                  >
+                    次 »
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+
         <label style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <input type="checkbox" checked={includeSummary} onChange={(e) => setIncludeSummary(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={includeSummary}
+            onChange={(e) => setIncludeSummary(e.target.checked)}
+          />
           各記事のAI要約を含める
         </label>
       </div>

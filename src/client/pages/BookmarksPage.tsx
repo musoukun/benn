@@ -18,7 +18,9 @@ export function BookmarksPage() {
           まだブックマークしていません。記事ページの 🔖 ボタンから保存できます
         </div>
       ) : (
-        items.map((a) => <ArticleCard key={a.id} a={a} />)
+        <div className="articles-grid">
+          {items.map((a) => <ArticleCard key={a.id} a={a} />)}
+        </div>
       )}
     </div>
   );

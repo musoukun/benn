@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import type { ArticleFull, User } from '../types';
 import { Avatar } from '../components/Avatar';
@@ -9,7 +9,6 @@ import { useOgMeta } from '../useOgMeta';
 
 export function ArticlePage() {
   const { id = '' } = useParams();
-  const nav = useNavigate();
   const [a, setA] = useState<ArticleFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
@@ -56,11 +55,6 @@ export function ArticlePage() {
     });
   }, [a]);
 
-  const onDelete = useCallback(() => {
-    if (!confirm('この記事を削除しますか？')) return;
-    api.deleteArticle(id).then(() => nav('/'));
-  }, [id, nav]);
-
   // OGP meta: 動的 OGP 画像 /api/ogp/articles/:id.png を埋める
   useOgMeta({
     title: a?.title,
@@ -97,12 +91,38 @@ export function ArticlePage() {
 
   return (
     <div className="container">
-      <article className="article-detail">
+      {/* 左フローティング: ♥ / 🔖 / (自分のなら 編集) */}
+      <div className="article-side-actions">
+        <button
+          className={'side-action-btn' + (a.likedByMe ? ' liked' : '')}
+          onClick={onLike}
+          title="いいね"
+          aria-label="いいね"
+        >
+          <span className="side-action-icon">♥</span>
+          <span className="side-action-count">{a.likeCount || 0}</span>
+        </button>
+        <button
+          className={'side-action-btn' + (a.bookmarkedByMe ? ' on' : '')}
+          onClick={onBookmark}
+          title="ブックマーク"
+          aria-label="ブックマーク"
+        >
+          <span className="side-action-icon">🔖</span>
+          <span className="side-action-count">{a.bookmarkCount || 0}</span>
+        </button>
         {a.isMine && (
-          <Link to={`/editor/${a.id}`} className="article-edit-fab" title="この記事を編集">
-            ✎ 編集
+          <Link
+            to={`/editor/${a.id}`}
+            className="side-action-btn side-action-edit"
+            title="編集"
+            aria-label="編集"
+          >
+            <span className="side-action-icon">✎</span>
           </Link>
         )}
+      </div>
+      <article className="article-detail">
         <div className="article-hero">
           <div className="emoji">{a.emoji || '📝'}</div>
           <h1>{a.title}</h1>
@@ -133,32 +153,6 @@ export function ArticlePage() {
         </div>
         <div className="md" dangerouslySetInnerHTML={{ __html: renderMd(a.body) }} />
         <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '32px 0' }} />
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 12,
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
-          <button className={'like-btn' + (a.likedByMe ? ' liked' : '')} onClick={onLike}>
-            ♥ {a.likeCount || 0}
-          </button>
-          <button className={'bm-btn' + (a.bookmarkedByMe ? ' on' : '')} onClick={onBookmark}>
-            🔖 {a.bookmarkCount || 0}
-          </button>
-          {a.isMine && (
-            <Link to={`/editor/${a.id}`} className="btn btn-ghost">
-              編集
-            </Link>
-          )}
-          {a.isMine && (
-            <button className="btn btn-danger" onClick={onDelete}>
-              削除
-            </button>
-          )}
-        </div>
 
         <CommentSection articleId={a.id} meId={me?.id || null} />
       </article>

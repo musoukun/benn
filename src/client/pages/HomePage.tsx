@@ -31,7 +31,9 @@ export function HomePage() {
           ) : items.length === 0 ? (
             <div className="empty">記事がまだありません</div>
           ) : (
-            items.map((a) => <ArticleCard key={a.id} a={a} />)
+            <div className="articles-grid">
+              {items.map((a) => <ArticleCard key={a.id} a={a} />)}
+            </div>
           )}
         </div>
         <aside>
