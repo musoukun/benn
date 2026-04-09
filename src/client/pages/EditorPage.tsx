@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { renderMd } from '../markdown';
 import { TagInput } from '../components/TagInput';
+import { AIReviewSidebar } from '../components/AIReviewSidebar';
 import type { Affiliation, CommunitySummary, CommunityFull } from '../types';
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -433,6 +434,8 @@ export function EditorPage() {
           dangerouslySetInnerHTML={{ __html: renderMd(body) }}
         />
       </div>
+      {/* AI レビューは右サイドバー (折りたたみ可能) */}
+      <AIReviewSidebar articleId={id || null} body={body} />
     </div>
   );
 }

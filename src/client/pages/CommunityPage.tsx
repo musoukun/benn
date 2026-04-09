@@ -12,6 +12,7 @@ export function CommunityPage() {
   const { id = '' } = useParams();
   const nav = useNavigate();
   const [c, setC] = useState<CommunityFull | null>(null);
+  const [meId, setMeId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>('timeline');
   const [activeTimelineId, setActiveTimelineId] = useState<string | null>(null);
@@ -38,6 +39,10 @@ export function CommunityPage() {
   }, [id, activeTimelineId]);
 
   useEffect(() => { reload(); }, [reload]);
+
+  useEffect(() => {
+    api.getMe().then((u) => setMeId(u?.id || null)).catch(() => setMeId(null));
+  }, []);
 
   useEffect(() => {
     if (!activeTimelineId || !c) return;
@@ -307,6 +312,7 @@ export function CommunityPage() {
                 <PostCard
                   key={p.id}
                   post={p}
+                  meId={meId}
                   onChanged={(np) =>
                     setTlPosts((prev) => prev.map((x) => (x.id === np.id ? np : x)))
                   }

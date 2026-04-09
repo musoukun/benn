@@ -78,6 +78,17 @@ export type CommunityTimeline = {
   visibilityAffiliationIds: string;
 };
 
+export type Comment = {
+  id: string;
+  body: string;
+  authorId: string;
+  author: { id: string; name: string; avatarUrl: string | null };
+  parentCommentId: string | null;
+  isMine: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Post = {
   id: string;
   body: string;

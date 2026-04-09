@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
-import type { AIReview, ArticleFull } from '../types';
+import type { ArticleFull, User } from '../types';
 import { Avatar } from '../components/Avatar';
+import { CommentSection } from '../components/CommentSection';
 import { renderMd } from '../markdown';
 
 export function ArticlePage() {
@@ -11,27 +12,11 @@ export function ArticlePage() {
   const [a, setA] = useState<ArticleFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
-  const [reviews, setReviews] = useState<AIReview[]>([]);
-  const [reviewing, setReviewing] = useState(false);
-  const [showReviews, setShowReviews] = useState(false);
+  const [me, setMe] = useState<User | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    api.listReviews(id).then(setReviews).catch(() => setReviews([]));
-  }, [id]);
-
-  const runReview = useCallback(async () => {
-    setReviewing(true);
-    try {
-      const r = await api.reviewArticle(id);
-      setReviews((prev) => [r, ...prev]);
-      setShowReviews(true);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setReviewing(false);
-    }
-  }, [id]);
+    api.getMe().then(setMe).catch(() => setMe(null));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -165,56 +150,9 @@ export function ArticlePage() {
               削除
             </button>
           )}
-          <button className="btn btn-ghost" disabled={reviewing} onClick={runReview}>
-            {reviewing ? 'AIレビュー中…' : '🤖 AIレビュー'}
-          </button>
-          {reviews.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => setShowReviews((v) => !v)}>
-              {showReviews ? 'レビューを隠す' : `レビュー${reviews.length}件を表示`}
-            </button>
-          )}
         </div>
 
-        {showReviews && reviews.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <h3>AIレビュー</h3>
-            {reviews.map((rv) => (
-              <div key={rv.id} className="card" style={{ marginBottom: 12 }}>
-                <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>
-                  {rv.user?.name || 'AI'} · {rv.createdAt?.slice(0, 16).replace('T', ' ')}
-                </div>
-                <p><strong>講評:</strong> {rv.summary}</p>
-                {rv.goodPoints?.length > 0 && (
-                  <>
-                    <strong>良い点</strong>
-                    <ul>{rv.goodPoints.map((g, i) => <li key={i}>{g}</li>)}</ul>
-                  </>
-                )}
-                {rv.improvements?.length > 0 && (
-                  <>
-                    <strong>改善点</strong>
-                    <ul>{rv.improvements.map((g, i) => <li key={i}>{g}</li>)}</ul>
-                  </>
-                )}
-                {rv.lineComments?.length > 0 && (
-                  <>
-                    <strong>行コメント</strong>
-                    {rv.lineComments.map((lc, i) => {
-                      const lines = (a?.body || '').split('\n');
-                      const target = lines[lc.line - 1] || '';
-                      return (
-                        <div key={i} style={{ marginTop: 8, padding: 8, background: '#f7fbfc', borderRadius: 6, borderLeft: '3px solid var(--accent)' }}>
-                          <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted)' }}>L{lc.line}: {target}</div>
-                          <div style={{ marginTop: 4 }}>{lc.body}</div>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <CommentSection articleId={a.id} meId={me?.id || null} />
       </article>
     </div>
   );

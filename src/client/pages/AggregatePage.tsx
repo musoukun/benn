@@ -76,7 +76,7 @@ export function AggregatePage() {
 
   return (
     <div className="container">
-      <h2 style={{ marginTop: 0 }}>記事の集約</h2>
+      <h2 style={{ marginTop: 0 }}>記事まとめ作成</h2>
       <p style={{ color: 'var(--muted)', fontSize: 13 }}>複数の記事を1つのまとめ記事にします。テンプレート内の <code>{'{{articles}}'}</code> が記事ブロックに置換されます。</p>
 
       <div className="card" style={{ marginBottom: 12 }}>
@@ -101,7 +101,7 @@ export function AggregatePage() {
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ marginTop: 0 }}>集約する記事を選択</h3>
+        <h3 style={{ marginTop: 0 }}>まとめる記事を選択</h3>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input
             placeholder="検索"
@@ -127,7 +127,7 @@ export function AggregatePage() {
       </div>
 
       <button className="btn" disabled={busy || picked.size === 0} onClick={render}>
-        {busy ? '生成中…' : '集約してエディタで開く'}
+        {busy ? '生成中…' : 'まとめ記事を作る'}
       </button>
     </div>
   );

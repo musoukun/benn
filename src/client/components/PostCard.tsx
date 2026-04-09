@@ -4,6 +4,7 @@ import { Avatar } from './Avatar';
 import type { Post } from '../types';
 import { api } from '../api';
 import { renderMd } from '../markdown';
+import { CommentSection } from './CommentSection';
 
 const FOLD_LENGTH = 600;
 const URL_RE = /(https?:\/\/[^\s<]+)/g;
@@ -29,14 +30,17 @@ function extractUrls(body: string): string[] {
 
 export function PostCard({
   post,
+  meId,
   onChanged,
   onDeleted,
 }: {
   post: Post;
+  meId?: string | null;
   onChanged?: (p: Post) => void;
   onDeleted?: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const isLong = post.body.length > FOLD_LENGTH;
   const shown = !isLong || expanded ? post.body : post.body.slice(0, FOLD_LENGTH) + '…';
   const urls = extractUrls(post.body);
@@ -100,10 +104,19 @@ export function PostCard({
         >
           {post.likedByMe ? '❤' : '🤍'} {post.likeCount}
         </button>
-        <button className="post-action" title="コメント (Phase2)" disabled>
+        <button
+          className="post-action"
+          onClick={() => setShowComments((v) => !v)}
+          title="コメント"
+        >
           💬 {post.commentCount}
         </button>
       </div>
+      {showComments && (
+        <div className="post-comments">
+          <CommentSection postId={post.id} meId={meId || null} />
+        </div>
+      )}
     </article>
   );
 }

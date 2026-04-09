@@ -61,7 +61,7 @@ export function Header() {
               ✨要約
             </NavLink>
             <NavLink to="/me/aggregate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              🪡集約
+              🪡記事まとめ作成
             </NavLink>
             <NavLink to="/me/settings" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
               ⚙設定

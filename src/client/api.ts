@@ -9,6 +9,7 @@ import type {
   CommunityFull,
   CommunitySummary,
   CommunityTimeline,
+  Comment,
   Post,
   Topic,
   User,
@@ -204,6 +205,19 @@ export const api = {
   deletePost: (id: string) => req<{ ok: boolean }>(`/posts/${id}`, { method: 'DELETE' }),
   togglePostLike: (id: string) =>
     req<{ liked: boolean; count: number }>(`/posts/${id}/like`, { method: 'POST' }),
+
+  // ---------- Comments ----------
+  listComments: (params: { articleId?: string; postId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params.articleId) qs.set('articleId', params.articleId);
+    if (params.postId) qs.set('postId', params.postId);
+    return req<Comment[]>('/comments?' + qs.toString());
+  },
+  createComment: (input: { body: string; articleId?: string; postId?: string; parentCommentId?: string }) =>
+    req<Comment>('/comments', { method: 'POST', body: JSON.stringify(input) }),
+  updateComment: (id: string, body: string) =>
+    req<Comment>(`/comments/${id}`, { method: 'PATCH', body: JSON.stringify({ body }) }),
+  deleteComment: (id: string) => req<{ ok: boolean }>(`/comments/${id}`, { method: 'DELETE' }),
 
   // ---------- AI ----------
   listAIConfigs: () => req<AIConfig[]>('/ai/configs'),
