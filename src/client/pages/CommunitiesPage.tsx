@@ -43,7 +43,7 @@ export function CommunitiesPage() {
           <span>{c.memberCount} メンバー</span>
           {c.isMember && <span className={`badge ${c.visibility === 'private' ? 'badge-private' : 'badge-public'}`}>参加中</span>}
         </div>
-        {c.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 13 }}>{c.description}</div>}
+        {c.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 15 }}>{c.description}</div>}
       </div>
     </Link>
   );
@@ -68,7 +68,7 @@ export function CommunitiesPage() {
           style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)', minHeight: 60, marginBottom: 8 }}
         />
         <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 13, marginRight: 8, fontWeight: 600 }}>公開範囲:</label>
+          <label style={{ fontSize: 15, marginRight: 8, fontWeight: 600 }}>公開範囲:</label>
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as any)}

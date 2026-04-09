@@ -51,7 +51,7 @@ test.describe('Phase3 通知', () => {
       data: {
         title: '通知テスト記事',
         emoji: '🔔',
-        type: 'tech',
+        type: 'howto',
         body: '通知テスト用の記事です。',
         topicNames: ['notif-test'],
         published: true,

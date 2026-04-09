@@ -71,7 +71,7 @@ test('編集モード: 絵文字パレットとカテゴリーカードが非表
       data: {
         title: 'edit test',
         emoji: '🐱',
-        type: 'tech',
+        type: 'howto',
         topicNames: ['rust'],
         body: '# hi',
         published: true,

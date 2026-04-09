@@ -21,7 +21,7 @@ test('Trending/Following/Bookmarks: 記事は 2-grid レイアウト', async ({ 
       data: {
         title: `gridtest ${i}`,
         emoji: '🧪',
-        type: 'tech',
+        type: 'howto',
         topicNames: ['test'],
         body: '# hi',
         published: true,

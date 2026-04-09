@@ -62,7 +62,7 @@ function AffiliationSection() {
   return (
     <div className="card">
       <h3 style={{ marginTop: 0 }}>所属タグ</h3>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>自分が所属するチームのタグを設定。記事公開時に閲覧範囲の指定に使えます。</p>
+      <p style={{ color: 'var(--muted)', fontSize: 15 }}>自分が所属するチームのタグを設定。記事公開時に閲覧範囲の指定に使えます。</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {all.map((a) => (
           <button
@@ -123,7 +123,7 @@ function AIConfigSection() {
   return (
     <div className="card">
       <h3 style={{ marginTop: 0 }}>AIプロバイダ</h3>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>OpenAI / Anthropic / Gemini のAPIキーを登録できます (AES-256-GCM で暗号化保存)。</p>
+      <p style={{ color: 'var(--muted)', fontSize: 15 }}>OpenAI / Anthropic / Gemini のAPIキーを登録できます (AES-256-GCM で暗号化保存)。</p>
 
       {items.map((it) => (
         <div key={it.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -181,7 +181,7 @@ function PromptSection() {
         <textarea
           value={review}
           onChange={(e) => setReview(e.target.value)}
-          style={{ width: '100%', minHeight: 240, padding: 12, borderRadius: 6, border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 13 }}
+          style={{ width: '100%', minHeight: 240, padding: 12, borderRadius: 6, border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 15 }}
         />
         <button className="btn" style={{ marginTop: 8 }} onClick={async () => { await api.setPrompt('review', review); alert('保存しました'); }}>保存</button>
       </div>
@@ -190,7 +190,7 @@ function PromptSection() {
         <textarea
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          style={{ width: '100%', minHeight: 160, padding: 12, borderRadius: 6, border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 13 }}
+          style={{ width: '100%', minHeight: 160, padding: 12, borderRadius: 6, border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 15 }}
         />
         <button className="btn" style={{ marginTop: 8 }} onClick={async () => { await api.setPrompt('summary', summary); alert('保存しました'); }}>保存</button>
       </div>

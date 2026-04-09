@@ -30,7 +30,7 @@ export async function createArticleViaApi(
     data: {
       title: input.title,
       emoji: '✅',
-      type: 'tech',
+      type: 'howto',
       body: input.body,
       topicNames: input.topicNames || ['e2e'],
       published: input.published ?? true,

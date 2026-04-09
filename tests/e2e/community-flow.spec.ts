@@ -91,7 +91,7 @@ test.describe('コミュニティ 3ユーザーフロー', () => {
       data: {
         title: 'Alice の公開記事',
         emoji: '🌍',
-        type: 'tech',
+        type: 'howto',
         body: '誰でも見える公開記事です。',
         topicNames: ['public'],
         published: true,
@@ -106,7 +106,7 @@ test.describe('コミュニティ 3ユーザーフロー', () => {
       data: {
         title: 'Alice のコミュニティ専用記事',
         emoji: '🤫',
-        type: 'tech',
+        type: 'howto',
         body: '# 内輪ネタ\n\nメンバーだけが見える秘密の記事です。',
         topicNames: ['secret'],
         published: true,

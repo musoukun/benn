@@ -79,8 +79,8 @@ export function AggregatePage() {
 
   return (
     <div className="container">
-      <h2 style={{ marginTop: 0 }}>まとめ作製</h2>
-      <p style={{ color: 'var(--muted)', fontSize: 13 }}>複数の記事を1つのまとめ記事にします。テンプレート内の <code>{'{{articles}}'}</code> が記事ブロックに置換されます。</p>
+      <h2 style={{ marginTop: 0 }}>まとめ記事作成</h2>
+      <p style={{ color: 'var(--muted)', fontSize: 15 }}>複数の記事を1つのまとめ記事にします。テンプレート内の <code>{'{{articles}}'}</code> が記事ブロックに置換されます。</p>
 
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>テンプレート</h3>
@@ -98,7 +98,7 @@ export function AggregatePage() {
         <textarea
           value={tplBody}
           onChange={(e) => setTplBody(e.target.value)}
-          style={{ width: '100%', minHeight: 160, padding: 8, border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'monospace', fontSize: 13 }}
+          style={{ width: '100%', minHeight: 160, padding: 8, border: '1px solid var(--border)', borderRadius: 6, fontFamily: 'monospace', fontSize: 15 }}
         />
         <button className="btn" style={{ marginTop: 8 }} onClick={saveTpl}>テンプレートを保存</button>
       </div>
@@ -131,7 +131,7 @@ export function AggregatePage() {
           const visible = articles.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
           return (
             <>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 4 }}>
                 {articles.length} 件中 {safePage * PAGE_SIZE + 1}〜
                 {Math.min(articles.length, safePage * PAGE_SIZE + PAGE_SIZE)} 件
                 ・選択中 {picked.size} 件
@@ -146,7 +146,7 @@ export function AggregatePage() {
                     checked={picked.has(a.id)}
                     onChange={() => toggle(a.id)}
                   />
-                  <span style={{ fontSize: 18 }}>{a.emoji || '📝'}</span>
+                  <span style={{ fontSize: 20 }}>{a.emoji || '📝'}</span>
                   <span style={{ flex: 1 }}>{a.title}</span>
                 </div>
               ))}
@@ -162,7 +162,7 @@ export function AggregatePage() {
                   >
                     « 前
                   </button>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 15, color: 'var(--muted)' }}>
                     {safePage + 1} / {totalPages}
                   </span>
                   <button

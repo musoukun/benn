@@ -52,7 +52,7 @@ model Article {
   slug        String    @unique
   title       String
   emoji       String?
-  type        String    // "tech" | "idea"
+  type        String    // "howto" | "diary"  (旧: "tech" | "idea")
   body        String
   published   Boolean   @default(false)
   publishedAt DateTime?

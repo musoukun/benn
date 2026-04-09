@@ -19,7 +19,7 @@ export function EditorPage() {
   const [emoji, setEmoji] = useState('📝');
   const [body, setBody] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
-  const [type, setType] = useState<'tech' | 'idea'>('tech');
+  const [type, setType] = useState<'howto' | 'diary'>('howto');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!id);
 
@@ -206,7 +206,7 @@ export function EditorPage() {
       setEmoji(a.emoji || '📝');
       setBody(a.body || '');
       setTopics((a.topics || []).map((t) => t.name));
-      setType((a.type as 'tech' | 'idea') || 'tech');
+      setType((a.type as 'howto' | 'diary') || 'howto');
       if (a.visibility) setVisibility(a.visibility);
       if (a.visibilityAffiliationIds)
         setVisibilityAffIds(a.visibilityAffiliationIds.split(',').filter(Boolean));
@@ -228,8 +228,8 @@ export function EditorPage() {
           alert('トピックを最低1つ入力してください');
           return;
         }
-        if (type !== 'tech' && type !== 'idea') {
-          alert('カテゴリ(Tech/Idea)を選んでください');
+        if (type !== 'howto' && type !== 'diary') {
+          alert('カテゴリ (Howto / Diary) を選んでください');
           return;
         }
       }
@@ -251,9 +251,15 @@ export function EditorPage() {
         const a = id
           ? await api.updateArticle(id, payload)
           : await api.createArticle(payload);
-        if (published) nav('/articles/' + a.id);
-        else if (scheduledAt) alert('予約しました: ' + scheduledAt);
-        else alert('下書き保存しました');
+        if (published) {
+          nav('/articles/' + a.id);
+        } else {
+          // 新規作成 → URL を /editor/<id> に置き換えて id を流し込む
+          // (これをしないと useParams().id が undefined のままで AI添削などが disabled になる)
+          if (!id) nav('/editor/' + a.id, { replace: true });
+          if (scheduledAt) alert('予約しました: ' + scheduledAt);
+          else alert('下書き保存しました');
+        }
       } catch (e: any) {
         alert('保存失敗: ' + e.message);
       } finally {
@@ -263,10 +269,45 @@ export function EditorPage() {
     [id, title, emoji, type, body, topics, nav, visibility, visibilityAffIds, scheduledAt, communityId, timelineId]
   );
 
+  // エディタは画面いっぱいを使うので、ページ全体のスクロールを抑止して
+  // 「ページのスクロールバー」と「プレビューペインの内部スクロールバー」が
+  // 二重に出るのを防ぐ。
+  // また、上部の sticky な .header の分だけエディタの高さが viewport を
+  // はみ出して下端が切れる問題があったため、ヘッダの実寸を測って
+  // CSS 変数 --header-h に流し込み、editor-page の高さを
+  // calc(100dvh - var(--header-h)) で計算する。
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    const header = document.querySelector('.header') as HTMLElement | null;
+    const setHeaderH = () => {
+      const h = header ? header.getBoundingClientRect().height : 0;
+      document.documentElement.style.setProperty('--header-h', `${h}px`);
+    };
+    setHeaderH();
+    let ro: ResizeObserver | null = null;
+    if (header && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(setHeaderH);
+      ro.observe(header);
+    }
+    window.addEventListener('resize', setHeaderH);
+
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.removeProperty('--header-h');
+      window.removeEventListener('resize', setHeaderH);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
   if (!loaded) return <div className="container-wide"><div className="loading">読み込み中…</div></div>;
 
   return (
-    <div className="container-wide">
+    <div className="container-wide editor-page">
       <div className="editor-toolbar">
         <div style={{ flex: 1 }} />
         <button
@@ -289,13 +330,32 @@ export function EditorPage() {
           type="button"
           className="btn btn-ghost btn-with-icon"
           onClick={() => setAiSidebarOpen(true)}
-          title="AIによる添削レビューを開く"
-          disabled={!id}
+          title={
+            !id
+              ? '下書き保存するとAI添削が使えるようになります'
+              : !title.trim()
+                ? 'タイトルを入力してください'
+                : !body.trim()
+                  ? '本文を入力してください'
+                  : 'AIによる添削レビューを開く'
+          }
+          disabled={!id || !title.trim() || !body.trim()}
         >
           <BotIcon size={16} />
           <span>AI添削</span>
         </button>
-        <button className="btn btn-ghost" disabled={saving} onClick={() => save(false)}>
+        <button
+          className="btn btn-ghost"
+          disabled={saving || !title.trim() || !body.trim()}
+          title={
+            !title.trim()
+              ? 'タイトルを入力してください'
+              : !body.trim()
+                ? '本文を入力してください'
+                : '下書きとして保存'
+          }
+          onClick={() => save(false)}
+        >
           下書き保存
         </button>
         <button
@@ -305,6 +365,9 @@ export function EditorPage() {
         >
           {saving ? '保存中…' : '公開する'}
         </button>
+      </div>
+      <div className="editor-toolbar-note">
+        ※ AI添削は「下書き保存」してから押せるようになります
       </div>
       <div className="editor-title-row">
         <input
@@ -326,10 +389,10 @@ export function EditorPage() {
         )}
       </div>
       <details style={{ marginBottom: 12 }} open={!!communityId}>
-        <summary style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 13 }}>公開オプション (公開範囲 / 予約公開 / コミュニティ)</summary>
+        <summary style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 15 }}>公開オプション (公開範囲 / 予約公開 / コミュニティ)</summary>
         <div style={{ padding: 12, background: 'var(--accent-soft-10)', border: '1px dashed rgba(95,207,220,.4)', borderRadius: 8, marginTop: 8, display: 'grid', gap: 12 }}>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>公開範囲</label>
+            <label style={{ fontWeight: 700, fontSize: 15 }}>公開範囲</label>
             <select value={visibility} onChange={(e) => setVisibility(e.target.value as any)}
               style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid var(--border)' }}>
               <option value="public">全体公開</option>
@@ -339,7 +402,7 @@ export function EditorPage() {
             {visibility !== 'public' && (
               <div style={{ marginTop: 6 }}>
                 {allAffiliations.map((a) => (
-                  <label key={a.id} style={{ marginRight: 8, fontSize: 13 }}>
+                  <label key={a.id} style={{ marginRight: 8, fontSize: 15 }}>
                     <input
                       type="checkbox"
                       checked={visibilityAffIds.includes(a.id)}
@@ -354,7 +417,7 @@ export function EditorPage() {
             )}
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>コミュニティに投稿</label>
+            <label style={{ fontWeight: 700, fontSize: 15 }}>コミュニティに投稿</label>
             <select value={communityId} onChange={(e) => setCommunityId(e.target.value)}
               style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid var(--border)' }}>
               <option value="">(なし)</option>
@@ -362,7 +425,7 @@ export function EditorPage() {
             </select>
             {communityDetail && communityDetail.timelines.length > 0 && (
               <>
-                <label style={{ fontWeight: 700, fontSize: 13, marginLeft: 16 }}>タイムライン (チャンネル)</label>
+                <label style={{ fontWeight: 700, fontSize: 15, marginLeft: 16 }}>タイムライン (チャンネル)</label>
                 <select value={timelineId} onChange={(e) => setTimelineId(e.target.value)}
                   style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid var(--border)' }}>
                   {communityDetail.timelines.map((tl) => <option key={tl.id} value={tl.id}># {tl.name}</option>)}
@@ -370,28 +433,27 @@ export function EditorPage() {
               </>
             )}
             {communityId && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>
                 投稿先タイムラインを選択。指定しない場合は「ホーム」に自動的に振り分けられます。
               </div>
             )}
             {communityId && communityDetail?.myRole === 'member' && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>※メンバー投稿は代表者の承認待ちになります</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 4 }}>※メンバー投稿は代表者の承認待ちになります</div>
             )}
           </div>
         </div>
       </details>
       <div className="editor-wrap">
-        <div className="editor-pane">
-          <textarea
-            ref={textareaRef}
-            placeholder="# 本文をMarkdownで… (画像は貼り付け / ドロップ / 🖼ボタン)"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onDrop={onDrop}
-            onPaste={onPaste}
-            onScroll={onEditorScroll}
-          />
-        </div>
+        <textarea
+          ref={textareaRef}
+          className="editor-pane"
+          placeholder="# 本文をMarkdownで… (画像は貼り付け / ドロップ / 🖼ボタン)"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onDrop={onDrop}
+          onPaste={onPaste}
+          onScroll={onEditorScroll}
+        />
         <div className="preview-pane-wrap">
           {/* 同期スクロール トグル (プレビュー上部の小さな丸ボタン) */}
           <button
@@ -453,7 +515,6 @@ export function EditorPage() {
       <PublishPanel
         open={publishPanelOpen}
         onClose={() => setPublishPanelOpen(false)}
-        isEdit={!!id}
         emoji={emoji}
         setEmoji={setEmoji}
         type={type}

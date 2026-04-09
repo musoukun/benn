@@ -177,11 +177,14 @@ api.get('/me', async (c) => {
 
 api.patch('/me', requireAuth, async (c) => {
   const me = c.get('user')!;
-  const body = await c.req.json<{ name?: string; bio?: string; avatarUrl?: string }>();
+  const body = await c.req.json<{ name?: string; bio?: string; avatarUrl?: string | null }>();
   const data: any = {};
   if (body.name !== undefined) data.name = String(body.name).slice(0, 100);
   if (body.bio !== undefined) data.bio = String(body.bio).slice(0, 500);
-  if (body.avatarUrl !== undefined) data.avatarUrl = String(body.avatarUrl).slice(0, 500);
+  if (body.avatarUrl !== undefined) {
+    // null を明示的に渡されたら頭文字アイコンに戻す
+    data.avatarUrl = body.avatarUrl === null ? null : String(body.avatarUrl).slice(0, 500);
+  }
   const updated = await prisma.user.update({ where: { id: me.id }, data });
   return c.json(safeUser(updated));
 });
@@ -295,7 +298,7 @@ api.get('/articles', async (c) => {
 
   const where: any = { published: true, approvalStatus: 'approved' };
   if (authorId) where.authorId = authorId;
-  if (type === 'tech' || type === 'idea') where.type = type;
+  if (type === 'howto' || type === 'diary') where.type = type;
   if (q) where.title = { contains: q };
   if (topicSlug) where.topics = { some: { topic: { slug: topicSlug } } };
 
@@ -403,7 +406,7 @@ async function saveArticle(
   const emoji = String(input.emoji || '📝').slice(0, 8);
   const body = String(input.body || '').slice(0, 49000);
   let published = !!input.published;
-  const type = input.type === 'idea' ? 'idea' : input.type === 'tech' ? 'tech' : '';
+  const type = input.type === 'diary' ? 'diary' : input.type === 'howto' ? 'howto' : '';
   const topicNames = (input.topicNames || []).slice(0, 5);
 
   // visibility
@@ -465,7 +468,7 @@ async function saveArticle(
 
   if (published) {
     if (!title.trim()) throw new Error('タイトルは必須です');
-    if (type !== 'tech' && type !== 'idea') throw new Error('カテゴリ(Tech/Idea)を選択してください');
+    if (type !== 'howto' && type !== 'diary') throw new Error('カテゴリ (Howto / Diary) を選択してください');
     if (topicNames.length === 0) throw new Error('トピックを最低1つ指定してください');
   }
 
@@ -506,7 +509,7 @@ async function saveArticle(
         slug: '',
         title,
         emoji,
-        type: type || 'tech',
+        type: type || 'howto',
         body,
         published,
         publishedAt: published ? new Date() : null,
@@ -727,7 +730,7 @@ const TRENDING_DAYS = Math.min(
 );
 
 api.get('/trending', async (c) => {
-  const type = c.req.query('type') === 'idea' ? 'idea' : 'tech';
+  const type = c.req.query('type') === 'diary' ? 'diary' : 'howto';
   const days = TRENDING_DAYS;
   const since = new Date(Date.now() - days * 86400 * 1000);
 

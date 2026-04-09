@@ -181,6 +181,28 @@ export function CommunityPage() {
     }
   };
 
+  // 「コミュニティから脱退」ボタン (ヘッダから自分自身が抜ける用)
+  const leaveCommunity = async () => {
+    if (!meId) return;
+    // 自分が最後の owner なら譲渡モーダルへ
+    if (isOwner && ownerCount === 1) {
+      setTransferOpen(true);
+      return;
+    }
+    if (!confirm(`「${c.name}」から脱退しますか？`)) return;
+    try {
+      await api.removeMember(c.id, meId);
+      setToast('コミュニティを脱退しました');
+      nav('/communities');
+    } catch (e) {
+      if (e instanceof ApiError && e.body?.error === 'last_owner') {
+        setTransferOpen(true);
+      } else {
+        setToast(e instanceof Error ? e.message : '脱退に失敗しました');
+      }
+    }
+  };
+
   const transferAndLeave = async (toUserId: string) => {
     try {
       await api.setMemberRole(c.id, toUserId, 'owner');
@@ -235,7 +257,7 @@ export function CommunityPage() {
         </div>
         {c.description && <p style={{ color: 'var(--muted)', marginBottom: 8 }}>{c.description}</p>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ color: 'var(--muted)', fontSize: 13 }}>{c.members.length} メンバー</span>
+          <span style={{ color: 'var(--muted)', fontSize: 15 }}>{c.members.length} メンバー</span>
           {isMember ? (
             <span className={`badge ${c.myRole === 'owner' ? 'badge-owner' : 'badge-member'}`}>
               あなた: {c.myRole === 'owner' ? '代表' : 'メンバー'}
@@ -244,13 +266,25 @@ export function CommunityPage() {
             <span className="badge badge-outsider">未参加 / 招待リンクが必要です</span>
           )}
           {isMember && (
-            <Link
-              to={`/editor?communityId=${c.id}&timelineId=${activeTimelineId || ''}`}
-              className="btn"
-              style={{ marginLeft: 'auto' }}
-            >
-              ✏ このコミュニティに投稿
-            </Link>
+            <>
+              <Link
+                to={`/editor?communityId=${c.id}&timelineId=${activeTimelineId || ''}`}
+                className="btn"
+                style={{ marginLeft: 'auto' }}
+              >
+                ✏ このコミュニティに投稿
+              </Link>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={leaveCommunity}
+                title={isOwner && ownerCount === 1
+                  ? '最後の代表のため、譲渡先を選んでから脱退します'
+                  : 'このコミュニティから脱退する'}
+              >
+                🚪 脱退
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -281,7 +315,7 @@ export function CommunityPage() {
                 title="新しいタイムラインを追加"
                 onClick={() => setTab('settings')}
               >
-                ＋ チャンネル追加
+                ＋ タイムライン追加
               </button>
             )}
             {isMember && activeTimelineId && (
@@ -325,7 +359,7 @@ export function CommunityPage() {
           {/* 記事 (Markdown 長文) */}
           {tlArticles.length > 0 && (
             <div style={{ marginTop: 24 }}>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8, fontWeight: 700 }}>
+              <div style={{ fontSize: 15, color: 'var(--muted)', marginBottom: 8, fontWeight: 700 }}>
                 📚 記事
               </div>
               {tlArticles.map((a) => (
@@ -400,7 +434,7 @@ export function CommunityPage() {
             pending.map((a: any) => (
               <div key={a.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 700 }}>{a.title}</div>
-                <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 8 }}>by {a.author?.name}</div>
+                <div style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 8 }}>by {a.author?.name}</div>
                 <Link to={`/articles/${a.id}`}>本文を確認</Link>
                 <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
                   <button className="btn" onClick={() => approve(a.id)}>承認</button>
@@ -425,7 +459,7 @@ export function CommunityPage() {
             />
             <button className="btn" onClick={issueInvite}>発行してコピー</button>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
             発行されたリンクは 7日間 有効です。
           </div>
           <h4 style={{ margin: '20px 0 8px' }}>発行済みの招待 ({invites.length})</h4>
@@ -495,7 +529,7 @@ export function CommunityPage() {
           </div>
 
           <h3>タイムライン管理</h3>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+          <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>
             タイムラインはコミュニティ内のチャンネルです。「ホーム」は必ず存在し、削除できません。
           </div>
           {c.timelines.map((tl) => (

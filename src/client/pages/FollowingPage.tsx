@@ -23,7 +23,7 @@ export function FollowingPage() {
         <div className="card" style={{ marginBottom: 16 }}>
           {followed.users.length > 0 && (
             <div style={{ marginBottom: 8 }}>
-              <b style={{ fontSize: 13, color: 'var(--muted)' }}>ユーザー: </b>
+              <b style={{ fontSize: 15, color: 'var(--muted)' }}>ユーザー: </b>
               {followed.users.map((u) => (
                 <Link key={u.id} to={`/users/${u.id}`} style={{ marginRight: 8 }}>
                   {u.name}
@@ -33,7 +33,7 @@ export function FollowingPage() {
           )}
           {followed.topics.length > 0 && (
             <div>
-              <b style={{ fontSize: 13, color: 'var(--muted)' }}>トピック: </b>
+              <b style={{ fontSize: 15, color: 'var(--muted)' }}>トピック: </b>
               {followed.topics.map((t) => (
                 <Link key={t.id} to={`/topics/${t.slug}`} className="tag" style={{ margin: '0 4px' }}>
                   {t.name}

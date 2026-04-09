@@ -3,6 +3,7 @@ dist
 *.log
 .env
 .env.local
+.claude/
 prisma/dev.db
 prisma/dev.db-journal
 data/

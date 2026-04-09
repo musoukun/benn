@@ -30,7 +30,7 @@ export type ArticleListItem = {
   slug: string;
   title: string;
   emoji: string | null;
-  type: 'tech' | 'idea';
+  type: 'howto' | 'diary';
   published: boolean;
   publishedAt: string | null;
   createdAt: string;

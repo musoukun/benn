@@ -20,7 +20,7 @@ test('Editor: AI添削ボタンから右からサイドバーが出る (水色�
       data: {
         title: 'air test',
         emoji: '🧪',
-        type: 'tech',
+        type: 'howto',
         topicNames: ['ai'],
         body: '# title\n\n本文',
         published: false,

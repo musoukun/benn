@@ -14,7 +14,7 @@ export function ArticleCard({ a }: { a: ArticleListItem }) {
           <div className="article-sub">
             {a.type && (
               <span className={'type-badge ' + a.type}>
-                {a.type === 'idea' ? 'IDEA' : 'TECH'}
+                {a.type === 'diary' ? 'DIARY' : 'HOWTO'}
               </span>
             )}
             <Avatar user={a.author} />

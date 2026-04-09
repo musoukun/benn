@@ -16,7 +16,7 @@ export function Sidebar() {
     <div className="card">
       <h3 style={{ marginTop: 0 }}>トピック</h3>
       {topics.length === 0 ? (
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>まだトピックがありません</p>
+        <p style={{ color: 'var(--muted)', fontSize: 15 }}>まだトピックがありません</p>
       ) : (
         <div>
           {topics.map((t) => (
@@ -29,7 +29,7 @@ export function Sidebar() {
       {me && (
         <>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' }} />
-          <Link to="/me/drafts" style={{ display: 'block', fontSize: 14 }}>
+          <Link to="/me/drafts" style={{ display: 'block', fontSize: 16 }}>
             📝 自分の投稿
           </Link>
         </>

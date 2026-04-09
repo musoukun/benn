@@ -36,7 +36,7 @@ export function RegisterPage() {
           </div>
         )}
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
+          <label style={{ display: 'block', fontSize: 15, color: 'var(--muted)', marginBottom: 4 }}>
             表示名
           </label>
           <input
@@ -55,7 +55,7 @@ export function RegisterPage() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
+          <label style={{ display: 'block', fontSize: 15, color: 'var(--muted)', marginBottom: 4 }}>
             メールアドレス
           </label>
           <input
@@ -72,7 +72,7 @@ export function RegisterPage() {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
+          <label style={{ display: 'block', fontSize: 15, color: 'var(--muted)', marginBottom: 4 }}>
             パスワード (8文字以上)
           </label>
           <input
@@ -92,7 +92,7 @@ export function RegisterPage() {
         <button type="submit" className="btn" disabled={busy} style={{ width: '100%' }}>
           {busy ? '登録中…' : '登録する'}
         </button>
-        <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center', color: 'var(--muted)' }}>
+        <p style={{ marginTop: 16, fontSize: 16, textAlign: 'center', color: 'var(--muted)' }}>
           すでにアカウントをお持ちの方は <Link to="/login">ログイン</Link>
         </p>
       </form>

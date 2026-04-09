@@ -2,12 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Avatar } from './Avatar';
 import { useMe, setMe } from '../useMe';
+import { useTheme } from '../useTheme';
 import { api } from '../api';
 import { NotificationBell } from './NotificationBell';
 
 export function Header() {
   const me = useMe();
   const nav = useNavigate();
+  const [theme, , toggleTheme] = useTheme();
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -67,6 +69,15 @@ export function Header() {
             if (e.key === 'Enter' && q.trim()) nav('/search?q=' + encodeURIComponent(q));
           }}
         />
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'ライトモードに切替' : 'ダークモードに切替'}
+          title={theme === 'dark' ? 'ライトモードに切替' : 'ダークモードに切替'}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
         {me === undefined ? null : me ? (
           <>
             <Link to="/editor" className="btn">
@@ -76,7 +87,7 @@ export function Header() {
               ✨要約
             </NavLink>
             <NavLink to="/me/aggregate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-              🪡まとめ作製
+              🪡まとめ記事作成
             </NavLink>
             <NotificationBell />
             {/* アバター → プルダウンメニュー */}

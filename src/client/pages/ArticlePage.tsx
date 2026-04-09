@@ -127,7 +127,7 @@ export function ArticlePage() {
           <div className="emoji">{a.emoji || '📝'}</div>
           <h1>{a.title}</h1>
           <div style={{ marginBottom: 8 }}>
-            <span className={'type-badge ' + a.type}>{a.type === 'idea' ? 'IDEA' : 'TECH'}</span>
+            <span className={'type-badge ' + a.type}>{a.type === 'diary' ? 'DIARY' : 'HOWTO'}</span>
           </div>
           <div className="article-author">
             <Avatar user={a.author} />

@@ -58,7 +58,7 @@ test.describe('Phase4 OGP', () => {
       data: {
         title: 'OGP テスト記事 — 自動生成された OGP 画像が出るはず',
         emoji: '🖼',
-        type: 'tech',
+        type: 'howto',
         body: 'OGP 画像生成のテスト記事です。Satori + resvg で動的に PNG が返ります。',
         topicNames: ['ogp'],
         published: true,

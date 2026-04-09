@@ -55,7 +55,7 @@ export const api = {
 
   // me / users
   getMe: () => req<User | null>('/me'),
-  updateMe: (patch: { name?: string; bio?: string; avatarUrl?: string }) =>
+  updateMe: (patch: { name?: string; bio?: string; avatarUrl?: string | null }) =>
     req<User>('/me', { method: 'PATCH', body: JSON.stringify(patch) }),
   getUser: (id: string) => req<import('./types').UserProfile>(`/users/${id}`),
   getUserPosts: (id: string) => req<import('./types').Post[]>(`/users/${id}/posts`),
@@ -107,7 +107,7 @@ export const api = {
     req<{ following: boolean }>(`/follows/check?targetType=${targetType}&targetId=${targetId}`),
 
   // trending
-  trending: (type: 'tech' | 'idea', days?: number) =>
+  trending: (type: 'howto' | 'diary', days?: number) =>
     req<{ days: number; items: ArticleListItem[] }>(
       `/trending?type=${type}` + (days ? `&days=${days}` : '')
     ),

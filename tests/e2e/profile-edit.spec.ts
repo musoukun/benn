@@ -49,6 +49,16 @@ test('ProfileEditor: 名前/bio/絵文字アバターを一括保存できる', 
   expect(afterMe.bio).toBe('自己紹介です');
   expect(afterMe.avatarUrl).toBeTruthy();
 
+  // ① 保存後にエディタが自動で閉じる
+  await expect(page.locator('.profile-editor')).toHaveCount(0, { timeout: 2000 });
+  // ② プロフィール hero が新しい名前で再描画される
+  await expect(page.locator('.profile-name')).toHaveText('テスト名');
+  // ③ ヘッダーのアバターが <img src=新URL> に置き換わる
+  const headerAvatarImg = page.locator('.account-menu-trigger .avatar img');
+  await expect(headerAvatarImg).toBeVisible({ timeout: 3000 });
+  const src = await headerAvatarImg.getAttribute('src');
+  expect(src).toBe(afterMe.avatarUrl);
+
   await ctx.close();
 });
 

@@ -35,7 +35,7 @@ export function LoginPage() {
           </div>
         )}
         <div style={{ marginBottom: 12 }}>
-          <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
+          <label style={{ display: 'block', fontSize: 15, color: 'var(--muted)', marginBottom: 4 }}>
             メールアドレス
           </label>
           <input
@@ -53,7 +53,7 @@ export function LoginPage() {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>
+          <label style={{ display: 'block', fontSize: 15, color: 'var(--muted)', marginBottom: 4 }}>
             パスワード
           </label>
           <input
@@ -73,7 +73,7 @@ export function LoginPage() {
         <button type="submit" className="btn" disabled={busy} style={{ width: '100%' }}>
           {busy ? 'ログイン中…' : 'ログイン'}
         </button>
-        <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center', color: 'var(--muted)' }}>
+        <p style={{ marginTop: 16, fontSize: 16, textAlign: 'center', color: 'var(--muted)' }}>
           アカウントをお持ちでない方は <Link to="/register">新規登録</Link>
         </p>
       </form>

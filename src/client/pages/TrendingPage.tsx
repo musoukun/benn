@@ -4,7 +4,7 @@ import type { ArticleListItem } from '../types';
 import { ArticleCard } from '../components/ArticleCard';
 
 export function TrendingPage() {
-  const [type, setType] = useState<'tech' | 'idea'>('tech');
+  const [type, setType] = useState<'howto' | 'diary'>('howto');
   const [items, setItems] = useState<ArticleListItem[] | null>(null);
   const [days, setDays] = useState<number>(30);
 
@@ -22,15 +22,15 @@ export function TrendingPage() {
   return (
     <div className="container">
       <h2 style={{ marginTop: 0 }}>🔥 Trending</h2>
-      <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
+      <div style={{ color: 'var(--muted)', fontSize: 15, marginBottom: 12 }}>
         過去 {days} 日間のいいね数で集計しています (サーバ設定)
       </div>
       <div className="tabs">
-        <button className={type === 'tech' ? 'active' : ''} onClick={() => setType('tech')}>
-          Tech
+        <button className={type === 'howto' ? 'active' : ''} onClick={() => setType('howto')}>
+          Howto
         </button>
-        <button className={type === 'idea' ? 'active' : ''} onClick={() => setType('idea')}>
-          Idea
+        <button className={type === 'diary' ? 'active' : ''} onClick={() => setType('diary')}>
+          Diary
         </button>
       </div>
       {items === null ? (

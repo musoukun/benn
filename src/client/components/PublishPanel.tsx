@@ -1,19 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import { TagInput } from './TagInput';
 
-// Zenn 風の「公開設定」パネル (右からスライドイン)
-// - 編集時 (isEdit=true) は アイキャッチ絵文字 と カテゴリー を非表示
+// 「公開設定」パネル (右からスライドイン)
+// - 記事アイコン / トピック / カテゴリー / 公開予約 を新規・編集どちらでも設定可能
 // - 「公開する」を押すと onPublish (= save(true)) が呼ばれる
-const EMOJI_PALETTE = [
-  '📝', '💡', '🚀', '🔥', '⚡', '✨', '🎯', '🛠',
-  '🐛', '🎨', '📚', '🌱', '🧠', '🎉', '💻', '🌟',
-  '🔍', '📊', '⚙️', '🤖', '🍀', '🦄', '🐱', '☕',
-];
 
 export function PublishPanel({
   open,
   onClose,
-  isEdit,
   emoji,
   setEmoji,
   type,
@@ -27,11 +22,10 @@ export function PublishPanel({
 }: {
   open: boolean;
   onClose: () => void;
-  isEdit: boolean;
   emoji: string;
   setEmoji: (v: string) => void;
-  type: 'tech' | 'idea';
-  setType: (v: 'tech' | 'idea') => void;
+  type: 'howto' | 'diary';
+  setType: (v: 'howto' | 'diary') => void;
   topics: string[];
   setTopics: (v: string[]) => void;
   scheduledAt: string;
@@ -39,6 +33,21 @@ export function PublishPanel({
   onPublish: () => void;
   saving: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerWrapRef = useRef<HTMLDivElement>(null);
+
+  // 外側クリックで EmojiPicker を閉じる
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (pickerWrapRef.current && !pickerWrapRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [pickerOpen]);
+
   if (!open) return null;
 
   // 公開ボタンのバリデーション (Zenn 同様)
@@ -62,32 +71,39 @@ export function PublishPanel({
           <h3>公開設定</h3>
         </div>
         <div className="publish-panel-body">
-          {!isEdit && (
-            <section className="publish-panel-section">
-              <label className="publish-panel-label">アイキャッチ絵文字を変更</label>
-              <div className="publish-panel-emoji-row">
-                <input
-                  type="text"
-                  value={emoji}
-                  onChange={(e) => setEmoji(e.target.value)}
-                  className="publish-panel-emoji-input"
-                  maxLength={4}
-                />
-                <div className="publish-panel-emoji-palette">
-                  {EMOJI_PALETTE.map((e) => (
-                    <button
-                      key={e}
-                      type="button"
-                      className={'publish-panel-emoji-cell' + (emoji === e ? ' active' : '')}
-                      onClick={() => setEmoji(e)}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
+          <section className="publish-panel-section">
+            <label className="publish-panel-label">記事アイコンを設定</label>
+              <div className="publish-panel-emoji-row" ref={pickerWrapRef}>
+                <button
+                  type="button"
+                  className="publish-panel-emoji-trigger"
+                  onClick={() => setPickerOpen((v) => !v)}
+                  aria-label="絵文字を選ぶ"
+                >
+                  <span className="publish-panel-emoji-trigger-icon">{emoji || '📝'}</span>
+                  <span className="publish-panel-emoji-trigger-label">
+                    クリックして絵文字を選ぶ
+                  </span>
+                </button>
+                {pickerOpen && (
+                  <div className="publish-panel-emoji-popover">
+                    <EmojiPicker
+                      onEmojiClick={(data) => {
+                        setEmoji(data.emoji);
+                        setPickerOpen(false);
+                      }}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      theme={Theme.LIGHT}
+                      width={340}
+                      height={400}
+                      lazyLoadEmojis
+                      searchPlaceholder="絵文字を検索..."
+                      previewConfig={{ showPreview: false }}
+                    />
+                  </div>
+                )}
+            </div>
+          </section>
 
           <section className="publish-panel-section">
             <label className="publish-panel-label">
@@ -101,35 +117,33 @@ export function PublishPanel({
             />
           </section>
 
-          {!isEdit && (
-            <section className="publish-panel-section">
-              <label className="publish-panel-label">
-                カテゴリー <span className="publish-panel-sub">選択</span>
-              </label>
-              <div className="publish-panel-category">
-                <button
-                  type="button"
-                  className={'publish-panel-cat-card' + (type === 'tech' ? ' active' : '')}
-                  onClick={() => setType('tech')}
-                >
-                  <div className="publish-panel-cat-title">Tech</div>
-                  <div className="publish-panel-cat-desc">
-                    ソフトウェアやハードウェアに関する技術記事 (実装/解説/手順)
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  className={'publish-panel-cat-card' + (type === 'idea' ? ' active' : '')}
-                  onClick={() => setType('idea')}
-                >
-                  <div className="publish-panel-cat-title">Idea</div>
-                  <div className="publish-panel-cat-desc">
-                    技術記事におさまらないプログラマー向けのアイデアや雑談
-                  </div>
-                </button>
-              </div>
-            </section>
-          )}
+          <section className="publish-panel-section">
+            <label className="publish-panel-label">
+              カテゴリー <span className="publish-panel-sub">選択</span>
+            </label>
+            <div className="publish-panel-category">
+              <button
+                type="button"
+                className={'publish-panel-cat-card' + (type === 'howto' ? ' active' : '')}
+                onClick={() => setType('howto')}
+              >
+                <div className="publish-panel-cat-title">Howto</div>
+                <div className="publish-panel-cat-desc">
+                  実装手順・ハンズオン・ツールの使い方など「やってみた / やり方」系のメモ
+                </div>
+              </button>
+              <button
+                type="button"
+                className={'publish-panel-cat-card' + (type === 'diary' ? ' active' : '')}
+                onClick={() => setType('diary')}
+              >
+                <div className="publish-panel-cat-title">Diary</div>
+                <div className="publish-panel-cat-desc">
+                  業務の経緯・ふりかえり・ドメイン知識・雑感など「物語性のある」記事
+                </div>
+              </button>
+            </div>
+          </section>
 
           <section className="publish-panel-section">
             <label className="publish-panel-label">公開予約</label>

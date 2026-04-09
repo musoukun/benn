@@ -46,7 +46,7 @@ test.describe('Phase5 検索 + アバター', () => {
       data: {
         title: `Phase5 検索テスト ${uniq}`,
         emoji: '🔍',
-        type: 'tech',
+        type: 'howto',
         body: `この記事は ${uniq} を含みます`,
         topicNames: ['phase5'],
         published: true,

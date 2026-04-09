@@ -51,7 +51,7 @@ test.describe('Phase2 コメント機能', () => {
       data: {
         title: 'コメントテスト記事',
         emoji: '🗨',
-        type: 'tech',
+        type: 'howto',
         body: '# はじめに\n\nコメント機能の動作確認です。',
         topicNames: ['comment-test'],
         published: true,

@@ -53,7 +53,7 @@ export function SearchPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <input
           className="search"
-          style={{ flex: 1, fontSize: 16, padding: '10px 14px' }}
+          style={{ flex: 1, fontSize: 18, padding: '10px 14px' }}
           placeholder="キーワードで検索…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -106,7 +106,7 @@ function renderItem(tab: Tab, it: any) {
         <div className="article-meta">
           <div className="article-title">{it.title}</div>
           <div className="article-sub">
-            <span className={'type-badge ' + it.type}>{it.type === 'idea' ? 'IDEA' : 'TECH'}</span>
+            <span className={'type-badge ' + it.type}>{it.type === 'diary' ? 'DIARY' : 'HOWTO'}</span>
             {it.author && <span>by {it.author.name}</span>}
             <span>♥ {it.likeCount || 0}</span>
           </div>
@@ -124,7 +124,7 @@ function renderItem(tab: Tab, it: any) {
             <span>{it.memberCount} メンバー</span>
             {it.isMember && <span className="badge badge-public">参加中</span>}
           </div>
-          {it.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 13 }}>{it.description}</div>}
+          {it.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 15 }}>{it.description}</div>}
         </div>
       </Link>
     );
@@ -137,13 +137,13 @@ function renderItem(tab: Tab, it: any) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
             <strong>{it.author?.name}</strong>
-            <span style={{ color: 'var(--muted)', fontSize: 12 }}>in {it.community?.name}</span>
+            <span style={{ color: 'var(--muted)', fontSize: 14 }}>in {it.community?.name}</span>
           </div>
-          <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          <div style={{ marginTop: 4, fontSize: 16, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             {(it.body || '').slice(0, 240)}
             {(it.body || '').length > 240 ? '…' : ''}
           </div>
-          <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 12 }}>
+          <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 14 }}>
             ❤ {it.likeCount} · 💬 {it.commentCount}
           </div>
         </div>
