@@ -207,6 +207,10 @@ export const api = {
   togglePostLike: (id: string) =>
     req<{ liked: boolean; count: number }>(`/posts/${id}/like`, { method: 'POST' }),
 
+  // ---------- 検索 ----------
+  search: (q: string, type: 'article' | 'community' | 'post') =>
+    req<{ items: any[] }>(`/search?type=${type}&q=${encodeURIComponent(q)}`),
+
   // ---------- OGP ----------
   fetchOgp: (url: string) =>
     req<{

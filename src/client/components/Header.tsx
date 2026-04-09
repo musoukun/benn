@@ -46,11 +46,11 @@ export function Header() {
         </NavLink>
         <input
           className="search"
-          placeholder="記事を検索…"
+          placeholder="記事 / コミュニティ / 投稿を検索…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') nav('/?q=' + encodeURIComponent(q));
+            if (e.key === 'Enter' && q.trim()) nav('/search?q=' + encodeURIComponent(q));
           }}
         />
         {me === undefined ? null : me ? (

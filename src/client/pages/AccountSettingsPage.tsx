@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { Affiliation, AIConfig } from '../types';
+import { AvatarSection } from '../components/AvatarSection';
 
-type Tab = 'affiliation' | 'ai' | 'prompts';
+type Tab = 'profile' | 'affiliation' | 'ai' | 'prompts';
 
 export function AccountSettingsPage() {
-  const [tab, setTab] = useState<Tab>('affiliation');
+  const [tab, setTab] = useState<Tab>('profile');
 
   return (
     <div className="container">
       <h2 style={{ marginTop: 0 }}>アカウント設定</h2>
       <div className="tabs">
+        <button className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')}>プロフィール</button>
         <button className={tab === 'affiliation' ? 'active' : ''} onClick={() => setTab('affiliation')}>所属</button>
         <button className={tab === 'ai' ? 'active' : ''} onClick={() => setTab('ai')}>AIプロバイダ</button>
         <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>プロンプト</button>
       </div>
+      {tab === 'profile' && <AvatarSection />}
       {tab === 'affiliation' && <AffiliationSection />}
       {tab === 'ai' && <AIConfigSection />}
       {tab === 'prompts' && <PromptSection />}

@@ -19,6 +19,7 @@ import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { SummarizePage } from './pages/SummarizePage';
 import { AggregatePage } from './pages/AggregatePage';
 import { InvitePage } from './pages/InvitePage';
+import { SearchPage } from './pages/SearchPage';
 
 export function App() {
   return (
@@ -27,6 +28,7 @@ export function App() {
       <Routes>
         {/* 公開 */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/articles/:id" element={<ArticlePage />} />
         <Route path="/users/:id" element={<ProfilePage />} />
