@@ -4,6 +4,10 @@ import { csrf } from 'hono/csrf';
 import { api } from './routes';
 import { authRoutes } from './auth-routes';
 import { loadUser } from './auth';
+import { startScheduler } from './scheduler';
+
+// 予約公開のバックグラウンドワーカー起動
+startScheduler();
 
 const app = new Hono();
 
@@ -18,7 +22,7 @@ app.get('/favicon.ico', (c) => c.body(null, 204));
 
 // グローバルエラーハンドラ
 app.onError((err, c) => {
-  console.error(err);
+  console.error('[onError]', c.req.method, c.req.url, '->', err);
   // バリデーションエラーは 400 で返す (Error.message をそのまま見せる)
   const status =
     err.message === 'not found' ? 404 :
@@ -51,7 +55,7 @@ if (isProd) {
   const { serve } = await import('@hono/node-server');
   const port = Number(process.env.PORT ?? 3000);
   serve({ fetch: app.fetch, port });
-  console.log(`Benn listening on http://localhost:${port}`);
+  console.log(`Uchi listening on http://localhost:${port}`);
 } else {
   app.get('*', (c) =>
     c.html(
@@ -60,7 +64,7 @@ if (isProd) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Benn (dev)</title>
+    <title>Uchi (dev)</title>
     <script type="module">
       import RefreshRuntime from "/@react-refresh"
       RefreshRuntime.injectIntoGlobalHook(window)

@@ -8,3 +8,6 @@ prisma/dev.db-journal
 data/
 uploads/
 doc/
+template-agenta-main
+test-results/
+screenshots*

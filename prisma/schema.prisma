@@ -1,4 +1,4 @@
-// Benn Prisma schema (SQLite)
+// Uchi Prisma schema (SQLite)
 generator client {
   provider = "prisma-client-js"
 }
@@ -17,15 +17,20 @@ model User {
   bio          String?
   createdAt    DateTime @default(now())
 
-  articles  Article[]
-  likes     Like[]
-  bookmarks Bookmark[]
-  follows   Follow[]
-  sessions  Session[]
+  articles         Article[]
+  likes            Like[]
+  bookmarks        Bookmark[]
+  follows          Follow[]
+  sessions         Session[]
+  affiliations     UserAffiliation[]
+  communityMembers CommunityMember[]
+  aiConfigs        UserAIConfig[]
+  aiPrompts        UserAIPrompt[]
+  aggTemplates     AggregationTemplate[]
+  reviews          ArticleReview[]
 }
 
 // Copenhagen Book 準拠のセッションテーブル
-// id: crypto.randomBytes(20).toString('base64url') の 160bit ランダム値
 model Session {
   id        String   @id
   userId    String
@@ -50,12 +55,33 @@ model Article {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // 予約公開
+  scheduledAt DateTime?
+
+  // 閲覧制御
+  // visibility: "public" | "affiliation_in" | "affiliation_out"
+  visibility               String  @default("public")
+  // CSV of affiliation IDs
+  visibilityAffiliationIds String  @default("")
+
+  // コミュニティ投稿 / 承認ワークフロー
+  communityId    String?
+  community      Community? @relation(fields: [communityId], references: [id])
+  timelineId     String?
+  timeline       CommunityTimeline? @relation(fields: [timelineId], references: [id])
+  approvalStatus String   @default("approved") // "draft" | "pending" | "approved" | "rejected"
+  approvalNote   String?
+
   topics    ArticleTopic[]
   likes     Like[]
   bookmarks Bookmark[]
+  reviews   ArticleReview[]
 
   @@index([authorId])
   @@index([published, publishedAt])
+  @@index([communityId])
+  @@index([timelineId])
+  @@index([scheduledAt])
 }
 
 model Topic {
@@ -67,7 +93,6 @@ model Topic {
   articles ArticleTopic[]
 }
 
-// 多対多 (Article <-> Topic)
 model ArticleTopic {
   articleId String
   topicId   String
@@ -112,4 +137,152 @@ model Follow {
 
   @@unique([userId, targetType, targetId])
   @@index([targetType, targetId])
+}
+
+// ============================================================
+// 所属 (タグ的な存在 — チームを表す)
+// ============================================================
+
+model Affiliation {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  users UserAffiliation[]
+}
+
+model UserAffiliation {
+  userId        String
+  affiliationId String
+  createdAt     DateTime @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  affiliation   Affiliation @relation(fields: [affiliationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, affiliationId])
+  @@index([affiliationId])
+}
+
+// ============================================================
+// コミュニティ
+// ============================================================
+
+model Community {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  // "public" | "private" — private は非メンバーから存在を隠す
+  visibility  String   @default("private")
+  createdAt   DateTime @default(now())
+
+  members   CommunityMember[]
+  invites   CommunityInvite[]
+  timelines CommunityTimeline[]
+  articles  Article[]
+}
+
+model CommunityMember {
+  userId      String
+  communityId String
+  // "owner" | "member"
+  role        String   @default("member")
+  createdAt   DateTime @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, communityId])
+  @@index([communityId])
+}
+
+model CommunityInvite {
+  id          String    @id @default(cuid())
+  communityId String
+  email       String?
+  token       String    @unique
+  acceptedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
+}
+
+model CommunityTimeline {
+  id          String   @id @default(cuid())
+  communityId String
+  name        String
+  // "public" | "members_only" | "affiliation_in"
+  visibility  String   @default("members_only")
+  visibilityAffiliationIds String @default("")
+  createdAt   DateTime @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  articles    Article[]
+
+  @@index([communityId])
+}
+
+// ============================================================
+// 集約テンプレート
+// ============================================================
+
+model AggregationTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  body      String   // Markdown 雛形。{{articles}} プレースホルダで集約位置を指定
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================
+// AI 設定 (per-user)
+// ============================================================
+
+model UserAIConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  // "openai" | "anthropic" | "gemini"
+  provider  String
+  endpoint  String?  // 省略時は各社デフォルト
+  model     String
+  apiKeyEnc String   // AES-256-GCM 暗号化済み (iv:tag:cipher hex)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserAIPrompt {
+  id        String   @id @default(cuid())
+  userId    String
+  // "review" | "summary"
+  kind      String
+  body      String
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+}
+
+// ============================================================
+// AI レビュー (履歴)
+// ============================================================
+
+model ArticleReview {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String   // レビュー実行者
+  // JSON 文字列: { summary, goodPoints[], improvements[], lineComments: [{line, body}] }
+  payload   String
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
 }

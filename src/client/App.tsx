@@ -13,6 +13,12 @@ import { TopicPage } from './pages/TopicPage';
 import { DraftsPage } from './pages/DraftsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CommunitiesPage } from './pages/CommunitiesPage';
+import { CommunityPage } from './pages/CommunityPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import { SummarizePage } from './pages/SummarizePage';
+import { AggregatePage } from './pages/AggregatePage';
+import { InvitePage } from './pages/InvitePage';
 
 export function App() {
   return (
@@ -66,6 +72,40 @@ export function App() {
           element={
             <RequireAuth>
               <DraftsPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="/communities" element={<CommunitiesPage />} />
+        <Route path="/communities/:id" element={<CommunityPage />} />
+        <Route
+          path="/me/settings"
+          element={
+            <RequireAuth>
+              <AccountSettingsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/me/summarize"
+          element={
+            <RequireAuth>
+              <SummarizePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/me/aggregate"
+          element={
+            <RequireAuth>
+              <AggregatePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/invite/:token"
+          element={
+            <RequireAuth>
+              <InvitePage />
             </RequireAuth>
           }
         />

@@ -5,8 +5,18 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from './db';
 import { requireAuth } from './auth';
 import type { User } from '@prisma/client';
+import { affiliationRoutes } from './routes-affiliations';
+import { communityRoutes } from './routes-communities';
+import { aiRoutes } from './routes-ai';
+import { aggregationRoutes } from './routes-aggregation';
 
 export const api = new Hono<{ Variables: { user: User | null } }>();
+
+// 拡張ルートを mount
+api.route('/affiliations', affiliationRoutes);
+api.route('/communities', communityRoutes);
+api.route('/ai', aiRoutes);
+api.route('/aggregation', aggregationRoutes);
 
 // ---------- file uploads (画像/GIF) ----------
 
@@ -128,6 +138,13 @@ const listSelect = {
   publishedAt: true,
   createdAt: true,
   updatedAt: true,
+  scheduledAt: true,
+  visibility: true,
+  visibilityAffiliationIds: true,
+  communityId: true,
+  timelineId: true,
+  approvalStatus: true,
+  approvalNote: true,
   author: { select: { id: true, name: true, avatarUrl: true } },
   topics: { select: { topic: { select: { id: true, name: true, slug: true } } } },
   _count: { select: { likes: true, bookmarks: true } },
@@ -175,13 +192,14 @@ api.get('/topics', async (c) => {
 // ---------- articles ----------
 
 api.get('/articles', async (c) => {
+  const me = c.get('user');
   const q = c.req.query('q');
   const topicSlug = c.req.query('topicSlug');
   const authorId = c.req.query('authorId');
   const type = c.req.query('type');
   const limit = Math.min(parseInt(c.req.query('limit') || '50', 10) || 50, 100);
 
-  const where: any = { published: true };
+  const where: any = { published: true, approvalStatus: 'approved' };
   if (authorId) where.authorId = authorId;
   if (type === 'tech' || type === 'idea') where.type = type;
   if (q) where.title = { contains: q };
@@ -190,10 +208,11 @@ api.get('/articles', async (c) => {
   const articles = await prisma.article.findMany({
     where,
     orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-    take: limit,
+    take: limit * 2, // visibility 弾きを考慮して多めに引く
     select: listSelect,
   });
-  return c.json(decorateMany(articles));
+  const visible = await filterByVisibility(articles as any, me?.id || null);
+  return c.json(decorateMany(visible.slice(0, limit) as any));
 });
 
 api.get('/articles/:id', async (c) => {
@@ -204,6 +223,11 @@ api.get('/articles/:id', async (c) => {
     select: { ...listSelect, body: true },
   });
   if (!a) return c.json({ error: 'not found' }, 404);
+  // visibility チェック (本人以外には弾く)
+  if (a.authorId !== me?.id) {
+    const visible = await filterByVisibility([a as any], me?.id || null);
+    if (visible.length === 0) return c.json({ error: 'forbidden' }, 403);
+  }
 
   let liked = null,
     bookmarked = null,
@@ -272,14 +296,78 @@ async function saveArticle(
     body?: string;
     topicNames?: string[];
     published?: boolean;
+    // 拡張フィールド
+    visibility?: string;
+    visibilityAffiliationIds?: string[];
+    scheduledAt?: string | null;
+    communityId?: string | null;
+    timelineId?: string | null;
+    approvalStatus?: string; // "draft" | "pending" | "approved"
   }
 ) {
   const title = String(input.title || '').slice(0, 200);
   const emoji = String(input.emoji || '📝').slice(0, 8);
   const body = String(input.body || '').slice(0, 49000);
-  const published = !!input.published;
+  let published = !!input.published;
   const type = input.type === 'idea' ? 'idea' : input.type === 'tech' ? 'tech' : '';
   const topicNames = (input.topicNames || []).slice(0, 5);
+
+  // visibility
+  const visibility =
+    input.visibility === 'affiliation_in' ||
+    input.visibility === 'affiliation_out' ||
+    input.visibility === 'public'
+      ? input.visibility
+      : 'public';
+  const visibilityAffiliationIds = (input.visibilityAffiliationIds || []).join(',');
+
+  // schedule
+  let scheduledAt: Date | null = null;
+  if (input.scheduledAt) {
+    const d = new Date(input.scheduledAt);
+    if (!isNaN(d.getTime())) scheduledAt = d;
+  }
+  // 予約があれば「未公開」状態にして後で公開する
+  if (scheduledAt && scheduledAt.getTime() > Date.now()) {
+    published = false;
+  }
+
+  // community
+  const communityId = input.communityId || null;
+  let timelineId = input.timelineId || null;
+  let approvalStatus = input.approvalStatus || 'approved';
+
+  // コミュニティ投稿は member の場合 pending に強制 (owner なら approved 可)
+  if (communityId) {
+    const m = await prisma.communityMember.findUnique({
+      where: { userId_communityId: { userId: meId, communityId } },
+    });
+    if (!m) throw new Error('そのコミュニティのメンバーではありません');
+    // timelineId 未指定 or 別 community の TL を指定 → ホーム TL に自動振り分け
+    let validTl: { id: string; communityId: string } | null = null;
+    if (timelineId) {
+      const t = await prisma.communityTimeline.findUnique({ where: { id: timelineId } });
+      if (t && t.communityId === communityId) validTl = t;
+    }
+    if (!validTl) {
+      const home = await prisma.communityTimeline.findFirst({
+        where: { communityId, name: 'ホーム' },
+      });
+      if (home) {
+        timelineId = home.id;
+      } else {
+        // ホーム TL が無い旧 community 用に作る
+        const created = await prisma.communityTimeline.create({
+          data: { communityId, name: 'ホーム', visibility: 'members_only' },
+        });
+        timelineId = created.id;
+      }
+    }
+    if (m.role !== 'owner' && published) {
+      approvalStatus = 'pending';
+      published = false;
+    }
+  }
 
   if (published) {
     if (!title.trim()) throw new Error('タイトルは必須です');
@@ -304,6 +392,12 @@ async function saveArticle(
         body,
         published,
         publishedAt: published ? existing.publishedAt ?? new Date() : null,
+        scheduledAt,
+        visibility,
+        visibilityAffiliationIds,
+        communityId,
+        timelineId,
+        approvalStatus,
         topics: {
           deleteMany: {},
           create: topics.map((t) => ({ topicId: t.id })),
@@ -322,6 +416,12 @@ async function saveArticle(
         body,
         published,
         publishedAt: published ? new Date() : null,
+        scheduledAt,
+        visibility,
+        visibilityAffiliationIds,
+        communityId,
+        timelineId,
+        approvalStatus,
         topics: { create: topics.map((t) => ({ topicId: t.id })) },
       },
     });
@@ -329,6 +429,43 @@ async function saveArticle(
     return getArticleFull(created.id, meId);
   }
 }
+
+// 閲覧者(me)の所属に基づき、記事配列をフィルタリング
+async function filterByVisibility<T extends {
+  visibility: string;
+  visibilityAffiliationIds: string;
+  authorId: string;
+  communityId: string | null;
+}>(items: T[], meId: string | null): Promise<T[]> {
+  let myAffIds = new Set<string>();
+  let myCommunityIds = new Set<string>();
+  if (meId) {
+    const [a, m] = await Promise.all([
+      prisma.userAffiliation.findMany({ where: { userId: meId } }),
+      prisma.communityMember.findMany({ where: { userId: meId } }),
+    ]);
+    myAffIds = new Set(a.map((x) => x.affiliationId));
+    myCommunityIds = new Set(m.map((x) => x.communityId));
+  }
+  return items.filter((it) => {
+    if (it.authorId === meId) return true;
+    if (it.communityId) {
+      // コミュニティ記事はメンバーのみ
+      if (!meId || !myCommunityIds.has(it.communityId)) return false;
+    }
+    if (it.visibility === 'public') return true;
+    const ids = (it.visibilityAffiliationIds || '').split(',').filter(Boolean);
+    if (it.visibility === 'affiliation_in') {
+      return ids.some((aid) => myAffIds.has(aid));
+    }
+    if (it.visibility === 'affiliation_out') {
+      return !ids.some((aid) => myAffIds.has(aid));
+    }
+    return true;
+  });
+}
+
+export { filterByVisibility };
 
 async function getArticleFull(id: string, meId: string) {
   const a = await prisma.article.findUnique({
@@ -475,9 +612,15 @@ api.get('/follows/check', requireAuth, async (c) => {
 
 // ---------- trending ----------
 
+// サーバ起動時に env から固定。デフォルト 30 日。
+const TRENDING_DAYS = Math.min(
+  365,
+  Math.max(1, parseInt(process.env.UCHI_TRENDING_DAYS || '30', 10) || 30)
+);
+
 api.get('/trending', async (c) => {
   const type = c.req.query('type') === 'idea' ? 'idea' : 'tech';
-  const days = Math.min(30, Math.max(1, parseInt(c.req.query('days') || '7', 10) || 7));
+  const days = TRENDING_DAYS;
   const since = new Date(Date.now() - days * 86400 * 1000);
 
   const recent = await prisma.like.groupBy({
@@ -501,5 +644,6 @@ api.get('/trending', async (c) => {
 // ---------- config ----------
 
 api.get('/config', (c) =>
-  c.json({ trendingDays: 7, trendingDaysMin: 1, trendingDaysMax: 30 })
+  // クライアント側はサーバ設定の値だけ参照する (スライダー廃止)
+  c.json({ trendingDays: TRENDING_DAYS })
 );

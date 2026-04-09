@@ -1,4 +1,7 @@
-# Benn
+# Uchi (うち)
+
+> 「うち (内/家)」 — 身内の場所、わたしたちの場所。
+> もとは便所の落書き由来で「Benn」だったが、ユーモアと内輪感を両立する名前に改名。
 
 社内に閉じた、Markdown 記事投稿 SNS。
 Notion などの社外 SaaS が利用禁止されている環境でも、Markdown で技術記事を書いて共有できる場所を作るための OSS です。
@@ -59,7 +62,7 @@ docker compose up -d
 ```
 
 ブラウザで `http://localhost:3000` を開きます。
-SQLite ファイルは Docker ボリューム `benn-data` に永続化されます。
+SQLite ファイルは Docker ボリューム `uchi-data` に永続化されます。
 
 ### ローカル開発
 
@@ -92,8 +95,8 @@ API は同じプロセスの Hono が `/api/*` で応答します。
 SQLite ファイルとアップロード画像をコピーすれば、そのままバックアップとして使えます。
 
 ```bash
-docker run --rm -v benn-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/benn-backup.tar.gz -C /data .
+docker run --rm -v uchi-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/uchi-backup.tar.gz -C /data .
 ```
 
 ## ライセンス

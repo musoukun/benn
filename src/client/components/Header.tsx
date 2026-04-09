@@ -19,7 +19,7 @@ export function Header() {
     <header className="header">
       <div className="header-inner">
         <Link to="/" className="logo">
-          📚 Benn
+          🏠 Uchi
         </Link>
         <NavLink to="/trending" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
           🔥 Trending
@@ -40,6 +40,9 @@ export function Header() {
             🔖 Bookmarks
           </NavLink>
         )}
+        <NavLink to="/communities" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+          🌐 Communities
+        </NavLink>
         <input
           className="search"
           placeholder="記事を検索…"
@@ -54,6 +57,15 @@ export function Header() {
             <Link to="/editor" className="btn">
               投稿する
             </Link>
+            <NavLink to="/me/summarize" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              ✨要約
+            </NavLink>
+            <NavLink to="/me/aggregate" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              🪡集約
+            </NavLink>
+            <NavLink to="/me/settings" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+              ⚙設定
+            </NavLink>
             <Link to={`/users/${me.id}`}>
               <Avatar user={me} />
             </Link>

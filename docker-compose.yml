@@ -1,10 +1,10 @@
 services:
-  benn:
+  uchi:
     build:
       context: .
       dockerfile: Dockerfile
-    image: benn:latest
-    container_name: benn
+    image: uchi:latest
+    container_name: uchi
     ports:
       - "3000:3000"
     environment:
@@ -13,8 +13,8 @@ services:
       PORT: "3000"
     volumes:
       # SQLite ファイルをホストに永続化
-      - benn-data:/app/data
+      - uchi-data:/app/data
     restart: unless-stopped
 
 volumes:
-  benn-data:
+  uchi-data:

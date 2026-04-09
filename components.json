@@ -1,0 +1,27 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.ts",
+    "css": "src/client/styles.css",
+    "baseColor": "slate",
+    "cssVariables": false
+  },
+  "aliases": {
+    "components": "src/client/components",
+    "utils": "src/client/lib/utils",
+    "ui": "src/client/components/ui",
+    "lib": "src/client/lib",
+    "hooks": "src/client/hooks"
+  },
+  "registries": {
+    "@kokonutui-pro": {
+      "url": "https://kokonutui.pro/api/r/{name}",
+      "headers": {
+        "X-API-Key": "${KOKO_PRO_TOKEN}"
+      }
+    }
+  }
+}

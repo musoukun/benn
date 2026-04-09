@@ -7,7 +7,7 @@ import { prisma } from './db';
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000; // 30 日
 const SESSION_REFRESH_MS = 15 * 24 * 60 * 60 * 1000;  // 残り <15日 で延長
-export const SESSION_COOKIE = 'benn_session';
+export const SESSION_COOKIE = 'uchi_session';
 
 export function generateSessionId(): string {
   return randomBytes(20).toString('base64url');

@@ -1,5 +1,5 @@
 {
-  "name": "benn",
+  "name": "uchi",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,10 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
@@ -26,6 +29,7 @@
   },
   "devDependencies": {
     "@hono/vite-dev-server": "^0.18.0",
+    "@playwright/test": "^1.59.1",
     "@types/katex": "^0.16.8",
     "@types/markdown-it": "^14.1.2",
     "@types/markdown-it-container": "^4.0.0",
