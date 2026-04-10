@@ -121,6 +121,8 @@ docker run --rm -v uchi-data:/data -v "$PWD":/backup alpine \
 
 [MIT License](./LICENSE) © 2026 musoukun
 
+# このプロジェクトと-zenn-の関係
+
 **Zenn から着想を得ている部分:**
 
 - Markdown エディタ + プレビューの 2 ペイン構成
