@@ -63,12 +63,30 @@ searchRoutes.get('/', async (c) => {
       take: 30,
     });
     let myIds = new Set<string>();
+    let myAffIds = new Set<string>();
     if (me) {
       const ms = await prisma.communityMember.findMany({ where: { userId: me.id } });
       myIds = new Set(ms.map((m) => m.communityId));
+      const affs = await prisma.userAffiliation.findMany({
+        where: { userId: me.id },
+        select: { affiliationId: true },
+      });
+      myAffIds = new Set(affs.map((a) => a.affiliationId));
     }
-    // private community は非メンバーから隠す
-    const visible = all.filter((c2) => c2.visibility === 'public' || myIds.has(c2.id));
+    // private / affiliation_* で見えないコミュニティは返さない
+    const visible = all.filter((c2) => {
+      if (myIds.has(c2.id)) return true;
+      if (c2.visibility === 'public') return true;
+      if (c2.visibility === 'private') return false;
+      const ids = (c2.visibilityAffiliationIds || '').split(',').filter(Boolean);
+      if (c2.visibility === 'affiliation_in') {
+        return ids.some((id) => myAffIds.has(id));
+      }
+      if (c2.visibility === 'affiliation_out') {
+        return !ids.some((id) => myAffIds.has(id));
+      }
+      return false;
+    });
     return c.json({
       items: visible.map((c2) => ({
         id: c2.id,

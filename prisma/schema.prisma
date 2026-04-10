@@ -181,9 +181,15 @@ model Community {
   slug        String   @unique
   description String?
   avatarUrl   String?  // コミュニティアイコン (画像 URL)。未設定なら頭文字フォールバック
-  // "public" | "private" — private は非メンバーから存在を隠す
-  visibility  String   @default("private")
-  createdAt   DateTime @default(now())
+  // "public" | "private" | "affiliation_in" | "affiliation_out"
+  //   public           … 全体に公開
+  //   private          … 招待したメンバーのみ
+  //   affiliation_in   … 指定の所属に属するユーザーにだけ見える (管理者のみ設定可)
+  //   affiliation_out  … 指定の所属に属するユーザーには見えない (管理者のみ設定可)
+  visibility               String   @default("private")
+  // affiliation_* で参照する所属 ID の CSV
+  visibilityAffiliationIds String   @default("")
+  createdAt                DateTime @default(now())
 
   members   CommunityMember[]
   leftLogs  CommunityLeftLog[]

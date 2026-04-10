@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
-import type { ArticleListItem, CommunityFull, Post } from '../types';
+import type {
+  Affiliation,
+  ArticleListItem,
+  CommunityFull,
+  CommunityVisibility,
+  Post,
+  User,
+} from '../types';
 import { Avatar } from '../components/Avatar';
 import { PostCard } from '../components/PostCard';
 import { PostComposer } from '../components/PostComposer';
@@ -14,7 +21,8 @@ export function CommunityPage() {
   const { id = '' } = useParams();
   const nav = useNavigate();
   const [c, setC] = useState<CommunityFull | null>(null);
-  const [meId, setMeId] = useState<string | null>(null);
+  const [me, setMe] = useState<User | null>(null);
+  const [allAffiliations, setAllAffiliations] = useState<Affiliation[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>('timeline');
   const [activeTimelineId, setActiveTimelineId] = useState<string | null>(null);
@@ -42,8 +50,11 @@ export function CommunityPage() {
   useEffect(() => { reload(); }, [reload]);
 
   useEffect(() => {
-    api.getMe().then((u) => setMeId(u?.id || null)).catch(() => setMeId(null));
+    api.getMe().then((u) => setMe(u)).catch(() => setMe(null));
+    // 所属ピッカー用。ログインしていなくても全体リストは公開 API なので OK
+    api.listAffiliations().then(setAllAffiliations).catch(() => setAllAffiliations([]));
   }, []);
+  const meId = me?.id || null;
 
   useEffect(() => {
     if (!activeTimelineId || !c) return;
@@ -231,7 +242,13 @@ export function CommunityPage() {
           <Avatar user={{ name: c.name, avatarUrl: c.avatarUrl }} size="lg" />
           <h2 style={{ margin: 0, flex: 1 }}>{c.name}</h2>
           <span className={`badge badge-${c.visibility}`}>
-            {c.visibility === 'private' ? '🔒 限定' : '🌐 公開'}
+            {c.visibility === 'public'
+              ? '🌐 全体公開'
+              : c.visibility === 'private'
+                ? '🔒 限定'
+                : c.visibility === 'affiliation_in'
+                  ? '🏷 所属限定'
+                  : '🏷 所属除外'}
           </span>
         </div>
         {ownerCount === 0 && (
@@ -249,7 +266,11 @@ export function CommunityPage() {
             </span>
           ) : (
             <span className="badge badge-outsider">
-              {c.visibility === 'public' ? '未参加' : '未参加 / 招待リンクが必要です'}
+              {c.visibility === 'public'
+                ? '未参加'
+                : c.visibility === 'private'
+                  ? '未参加 / 招待リンクが必要です'
+                  : '未参加 / 管理者にお問い合わせください'}
             </span>
           )}
           {isMember && (
@@ -520,20 +541,16 @@ export function CommunityPage() {
       )}
       {tab === 'settings' && isOwner && (
         <div className="card" style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0 }}>公開範囲</h3>
-          <div style={{ marginBottom: 16 }}>
-            <select
-              value={c.visibility}
-              onChange={async (e) => {
-                await api.updateCommunity(c.id, { visibility: e.target.value as any });
-                reload();
-              }}
-              style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)' }}
-            >
-              <option value="private">🔒 限定 (招待リンクのみ。一覧/直リンクからは見えない)</option>
-              <option value="public">🌐 公開 (誰でも一覧で見つけられる)</option>
-            </select>
-          </div>
+          <CommunityVisibilityEditor
+            community={c}
+            isAdmin={!!me?.isAdmin}
+            affiliations={allAffiliations}
+            onSaved={() => {
+              reload();
+              setToast('公開範囲を更新しました');
+            }}
+            onError={(msg) => setToast(msg)}
+          />
 
           <h3>タイムライン管理</h3>
           <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>
@@ -569,6 +586,230 @@ export function CommunityPage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------
+// 公開範囲エディタ
+// 3 モード:
+//   public           … 全体に公開
+//   private          … 招待したメンバーのみ
+//   affiliation_*    … 管理者専用 / 所属IDリストで可視性を制御
+//     - affiliation_in  : 指定した所属に属するユーザーに「見える」
+//     - affiliation_out : 指定した所属に属するユーザーには「見えない」
+// ---------------------------------------------------------------
+function CommunityVisibilityEditor({
+  community,
+  isAdmin,
+  affiliations,
+  onSaved,
+  onError,
+}: {
+  community: CommunityFull;
+  isAdmin: boolean;
+  affiliations: Affiliation[];
+  onSaved: () => void;
+  onError: (msg: string) => void;
+}) {
+  // UI 上の 3 モード。affiliation_in/out は「所属」というまとめで 1 つ
+  type Mode = 'public' | 'private' | 'affiliation';
+  const initialMode: Mode =
+    community.visibility === 'public'
+      ? 'public'
+      : community.visibility === 'affiliation_in' || community.visibility === 'affiliation_out'
+        ? 'affiliation'
+        : 'private';
+  const initialSub: 'in' | 'out' =
+    community.visibility === 'affiliation_out' ? 'out' : 'in';
+  const initialIds = (community.visibilityAffiliationIds || '')
+    .split(',')
+    .filter(Boolean);
+
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [sub, setSub] = useState<'in' | 'out'>(initialSub);
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialIds);
+  const [saving, setSaving] = useState(false);
+
+  const dirty =
+    mode !== initialMode ||
+    (mode === 'affiliation' &&
+      (sub !== initialSub ||
+        selectedIds.slice().sort().join(',') !== initialIds.slice().sort().join(',')));
+
+  const toggle = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const save = async () => {
+    let visibility: CommunityVisibility;
+    if (mode === 'public') visibility = 'public';
+    else if (mode === 'private') visibility = 'private';
+    else visibility = sub === 'in' ? 'affiliation_in' : 'affiliation_out';
+
+    if (mode === 'affiliation' && selectedIds.length === 0) {
+      onError('所属を 1 つ以上選択してください');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.updateCommunity(community.id, {
+        visibility,
+        ...(mode === 'affiliation' ? { visibilityAffiliationIds: selectedIds } : {}),
+      });
+      onSaved();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : '保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0 }}>公開範囲</h3>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="community-visibility"
+            checked={mode === 'public'}
+            onChange={() => setMode('public')}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            <strong>🌐 全体に公開</strong>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              誰でも一覧から見つけられます
+            </div>
+          </span>
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="radio"
+            name="community-visibility"
+            checked={mode === 'private'}
+            onChange={() => setMode('private')}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            <strong>🔒 限定</strong>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              招待したメンバーのみ
+            </div>
+          </span>
+        </label>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+            cursor: isAdmin ? 'pointer' : 'not-allowed',
+            opacity: isAdmin ? 1 : 0.55,
+          }}
+          title={isAdmin ? undefined : '所属ベースの公開範囲は管理者のみ設定できます'}
+        >
+          <input
+            type="radio"
+            name="community-visibility"
+            checked={mode === 'affiliation'}
+            onChange={() => isAdmin && setMode('affiliation')}
+            disabled={!isAdmin}
+            style={{ marginTop: 4 }}
+          />
+          <span>
+            <strong>🏷 所属ベース</strong>
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              選んだ所属に「見える」または「見えない」を指定します (管理者のみ)
+            </div>
+          </span>
+        </label>
+      </div>
+
+      {mode === 'affiliation' && isAdmin && (
+        <div
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="community-visibility-sub"
+                checked={sub === 'in'}
+                onChange={() => setSub('in')}
+              />
+              この所属には<strong>見える</strong>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="community-visibility-sub"
+                checked={sub === 'out'}
+                onChange={() => setSub('out')}
+              />
+              この所属には<strong>見えない</strong>
+            </label>
+          </div>
+
+          {affiliations.length === 0 ? (
+            <div style={{ color: 'var(--muted)', fontSize: 14 }}>
+              所属が 1 つも登録されていません。管理ページから追加してください。
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              {affiliations.map((a) => {
+                const on = selectedIds.includes(a.id);
+                return (
+                  <label
+                    key={a.id}
+                    className={`tag${on ? ' tag-on' : ''}`}
+                    style={{
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      border: '1px solid var(--border)',
+                      background: on ? 'var(--accent)' : 'transparent',
+                      color: on ? '#fff' : 'inherit',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggle(a.id)}
+                      style={{ display: 'none' }}
+                    />
+                    {a.name}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <button className="btn" disabled={!dirty || saving} onClick={save}>
+        {saving ? '保存中…' : '公開範囲を保存'}
+      </button>
     </div>
   );
 }

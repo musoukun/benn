@@ -41,7 +41,13 @@ export function CommunitiesPage() {
           <img src={c.avatarUrl} alt={c.name} />
         </span>
       ) : (
-        <div className="article-emoji">{c.visibility === 'private' ? '🔒' : '🌐'}</div>
+        <div className="article-emoji">
+          {c.visibility === 'public'
+            ? '🌐'
+            : c.visibility === 'private'
+              ? '🔒'
+              : '🏷'}
+        </div>
       )}
       <div className="article-meta">
         <div className="article-title">{c.name}</div>
@@ -52,7 +58,7 @@ export function CommunitiesPage() {
               👻 代表者なし
             </span>
           )}
-          {c.isMember && <span className={`badge ${c.visibility === 'private' ? 'badge-private' : 'badge-public'}`}>参加中</span>}
+          {c.isMember && <span className={`badge badge-${c.visibility}`}>参加中</span>}
         </div>
         {c.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 15 }}>{c.description}</div>}
       </div>
@@ -85,8 +91,8 @@ export function CommunitiesPage() {
             onChange={(e) => setVisibility(e.target.value as any)}
             style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }}
           >
-            <option value="private">🔒 限定 (招待リンクのみ)</option>
-            <option value="public">🌐 公開 (誰でも一覧から見つけられる)</option>
+            <option value="private">🔒 限定 (招待したメンバーのみ)</option>
+            <option value="public">🌐 全体に公開 (誰でも一覧から見つけられる)</option>
           </select>
         </div>
         <button className="btn" disabled={creating} onClick={create}>

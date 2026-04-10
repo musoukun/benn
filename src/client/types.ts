@@ -64,13 +64,20 @@ export type Affiliation = {
   createdAt?: string;
 };
 
+export type CommunityVisibility =
+  | 'public'
+  | 'private'
+  | 'affiliation_in'
+  | 'affiliation_out';
+
 export type CommunitySummary = {
   id: string;
   name: string;
   slug: string;
   description: string | null;
   avatarUrl: string | null;
-  visibility: 'public' | 'private';
+  visibility: CommunityVisibility;
+  visibilityAffiliationIds?: string;
   memberCount: number;
   ownerCount: number;
   isMember: boolean;
@@ -139,7 +146,8 @@ export type CommunityFull = {
   slug: string;
   description: string | null;
   avatarUrl: string | null;
-  visibility: 'public' | 'private';
+  visibility: CommunityVisibility;
+  visibilityAffiliationIds?: string;
   members: CommunityMember[];
   timelines: CommunityTimeline[];
   myRole: 'owner' | 'member' | null;

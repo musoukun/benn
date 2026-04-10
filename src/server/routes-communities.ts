@@ -23,6 +23,61 @@ async function requireOwner(communityId: string, userId: string) {
   if (!m || m.role !== 'owner') throw new Error('forbidden');
 }
 
+// ---- visibility helpers -------------------------------------------------
+// Community.visibility ∈ { public | private | affiliation_in | affiliation_out }
+//   public           … 全体に公開
+//   private          … 招待したメンバーのみ (非メンバーからは存在を隠す)
+//   affiliation_in   … 指定の所属 ID のいずれかに属するユーザーにだけ見える
+//   affiliation_out  … 指定の所属 ID のいずれにも属していないユーザーにだけ見える
+// affiliation_* は管理者 (User.isAdmin) のみが設定可能。
+async function loadMyAffiliationIds(userId: string): Promise<Set<string>> {
+  const rows = await prisma.userAffiliation.findMany({
+    where: { userId },
+    select: { affiliationId: true },
+  });
+  return new Set(rows.map((r) => r.affiliationId));
+}
+
+function isCommunityVisibleTo(
+  c2: { visibility: string; visibilityAffiliationIds: string },
+  isMember: boolean,
+  myAffIds: Set<string>
+): boolean {
+  // メンバーは常に見える (所属フィルタで自分のコミュニティが見えなくなると混乱するため)
+  if (isMember) return true;
+  if (c2.visibility === 'public') return true;
+  if (c2.visibility === 'private') return false;
+  const ids = (c2.visibilityAffiliationIds || '').split(',').filter(Boolean);
+  if (c2.visibility === 'affiliation_in') {
+    return ids.some((id) => myAffIds.has(id));
+  }
+  if (c2.visibility === 'affiliation_out') {
+    return !ids.some((id) => myAffIds.has(id));
+  }
+  return false;
+}
+
+// 入力 visibility の正規化。affiliation_* は isAdmin 限定。
+function normalizeVisibility(
+  requested: string | undefined,
+  isAdmin: boolean
+): { visibility: 'public' | 'private' | 'affiliation_in' | 'affiliation_out'; affiliationAllowed: boolean } {
+  if (requested === 'public') return { visibility: 'public', affiliationAllowed: false };
+  if (requested === 'affiliation_in' || requested === 'affiliation_out') {
+    if (!isAdmin) {
+      // 権限が無ければ public にフォールバックせずエラーにする
+      throw new Error('affiliation_visibility_admin_only');
+    }
+    return { visibility: requested, affiliationAllowed: true };
+  }
+  return { visibility: 'private', affiliationAllowed: false };
+}
+
+function normalizeAffIdList(input: unknown): string {
+  if (!Array.isArray(input)) return '';
+  return input.filter((x) => typeof x === 'string' && x.length > 0).join(',');
+}
+
 async function requireMember(communityId: string, userId: string) {
   const m = await prisma.communityMember.findUnique({
     where: { userId_communityId: { userId, communityId } },
@@ -40,12 +95,16 @@ communityRoutes.get('/', async (c) => {
     include: { _count: { select: { members: true } } },
   });
   let myIds = new Set<string>();
+  let myAffIds = new Set<string>();
   if (me) {
     const ms = await prisma.communityMember.findMany({ where: { userId: me.id } });
     myIds = new Set(ms.map((m) => m.communityId));
+    myAffIds = await loadMyAffiliationIds(me.id);
   }
-  // private で非メンバーには返さない
-  const visible = all.filter((c2) => c2.visibility === 'public' || myIds.has(c2.id));
+  // private / affiliation_* で見えないものは返さない
+  const visible = all.filter((c2) =>
+    isCommunityVisibleTo(c2, myIds.has(c2.id), myAffIds)
+  );
   // 各コミュニティの owner 数を一括で取得
   const ownerRows = await prisma.communityMember.groupBy({
     by: ['communityId'],
@@ -61,6 +120,7 @@ communityRoutes.get('/', async (c) => {
       description: c2.description,
       avatarUrl: c2.avatarUrl,
       visibility: c2.visibility,
+      visibilityAffiliationIds: c2.visibilityAffiliationIds,
       memberCount: c2._count.members,
       ownerCount: ownerCountMap.get(c2.id) || 0,
       isMember: myIds.has(c2.id),
@@ -70,14 +130,23 @@ communityRoutes.get('/', async (c) => {
 
 communityRoutes.post('/', requireAuth, async (c) => {
   const me = c.get('user')!;
-  const { name, description, visibility } = await c.req.json<{
+  const { name, description, visibility, visibilityAffiliationIds } = await c.req.json<{
     name: string;
     description?: string;
     visibility?: string;
+    visibilityAffiliationIds?: string[];
   }>();
   const trimmed = String(name || '').trim().slice(0, 60);
   if (!trimmed) return c.json({ error: 'name は必須です' }, 400);
-  const vis = visibility === 'public' ? 'public' : 'private';
+  let vis: 'public' | 'private' | 'affiliation_in' | 'affiliation_out';
+  let allowAffIds: boolean;
+  try {
+    const r = normalizeVisibility(visibility, !!me.isAdmin);
+    vis = r.visibility;
+    allowAffIds = r.affiliationAllowed;
+  } catch {
+    return c.json({ error: '所属ベースの公開範囲は管理者のみ設定できます' }, 403);
+  }
   // slug 衝突対策: 既存があればサフィックスを足す
   let slug = slugify(trimmed);
   const conflict = await prisma.community.findUnique({ where: { slug } });
@@ -87,6 +156,7 @@ communityRoutes.post('/', requireAuth, async (c) => {
       name: trimmed,
       slug,
       visibility: vis,
+      visibilityAffiliationIds: allowAffIds ? normalizeAffIdList(visibilityAffiliationIds) : '',
       description: description ? String(description).slice(0, 500) : null,
       members: { create: { userId: me.id, role: 'owner' } },
       // 必ず「ホーム」TL を持つ
@@ -108,8 +178,9 @@ communityRoutes.get('/:id', async (c) => {
   });
   if (!community) return c.json({ error: 'not found' }, 404);
   const myMember = me ? community.members.find((m) => m.userId === me.id) : null;
-  // private community は非メンバーから完全に隠す (404)
-  if (community.visibility === 'private' && !myMember) {
+  // private / affiliation_* で見えないコミュニティは非メンバーから完全に隠す (404)
+  const myAffIds = me ? await loadMyAffiliationIds(me.id) : new Set<string>();
+  if (!isCommunityVisibleTo(community, !!myMember, myAffIds)) {
     return c.json({ error: 'not found' }, 404);
   }
   // 「ホーム」TL が無い旧データ救済 (auto heal)
@@ -126,6 +197,7 @@ communityRoutes.get('/:id', async (c) => {
     description: community.description,
     avatarUrl: community.avatarUrl,
     visibility: community.visibility,
+    visibilityAffiliationIds: community.visibilityAffiliationIds,
     members: community.members.map((m) => ({
       id: m.userId,
       role: m.role,
@@ -141,18 +213,43 @@ communityRoutes.patch('/:id', requireAuth, async (c) => {
   const me = c.get('user')!;
   const id = c.req.param('id');
   await requireOwner(id, me.id);
-  const { name, description, visibility, avatarUrl } = await c.req.json<{
-    name?: string;
-    description?: string;
-    visibility?: string;
-    avatarUrl?: string | null;
-  }>();
+  const { name, description, visibility, visibilityAffiliationIds, avatarUrl } =
+    await c.req.json<{
+      name?: string;
+      description?: string;
+      visibility?: string;
+      visibilityAffiliationIds?: string[];
+      avatarUrl?: string | null;
+    }>();
+  // visibility 関連のパッチ
+  const visPatch: {
+    visibility?: 'public' | 'private' | 'affiliation_in' | 'affiliation_out';
+    visibilityAffiliationIds?: string;
+  } = {};
+  if (visibility !== undefined) {
+    try {
+      const r = normalizeVisibility(visibility, !!me.isAdmin);
+      visPatch.visibility = r.visibility;
+      // affiliation_* の場合のみ affiliationIds を受け取る。それ以外は空文字へ
+      visPatch.visibilityAffiliationIds = r.affiliationAllowed
+        ? normalizeAffIdList(visibilityAffiliationIds)
+        : '';
+    } catch {
+      return c.json({ error: '所属ベースの公開範囲は管理者のみ設定できます' }, 403);
+    }
+  } else if (visibilityAffiliationIds !== undefined) {
+    // visibility 自体は変えずに ID リストだけ差し替える場合も管理者限定
+    if (!me.isAdmin) {
+      return c.json({ error: '所属 ID の変更は管理者のみ行えます' }, 403);
+    }
+    visPatch.visibilityAffiliationIds = normalizeAffIdList(visibilityAffiliationIds);
+  }
   const updated = await prisma.community.update({
     where: { id },
     data: {
       ...(name !== undefined ? { name: String(name).slice(0, 60) } : {}),
       ...(description !== undefined ? { description: String(description).slice(0, 500) } : {}),
-      ...(visibility === 'public' || visibility === 'private' ? { visibility } : {}),
+      ...visPatch,
       ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
     },
   });

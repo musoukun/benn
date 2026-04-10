@@ -151,7 +151,12 @@ export const api = {
 
   // ---------- コミュニティ ----------
   listCommunities: () => req<CommunitySummary[]>('/communities'),
-  createCommunity: (input: { name: string; description?: string; visibility?: 'public' | 'private' }) =>
+  createCommunity: (input: {
+    name: string;
+    description?: string;
+    visibility?: 'public' | 'private' | 'affiliation_in' | 'affiliation_out';
+    visibilityAffiliationIds?: string[];
+  }) =>
     req<{ id: string; slug: string; name: string }>('/communities', {
       method: 'POST',
       body: JSON.stringify(input),
@@ -162,7 +167,8 @@ export const api = {
     patch: {
       name?: string;
       description?: string;
-      visibility?: 'public' | 'private';
+      visibility?: 'public' | 'private' | 'affiliation_in' | 'affiliation_out';
+      visibilityAffiliationIds?: string[];
       avatarUrl?: string | null;
     }
   ) => req<any>(`/communities/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { ArticleListItem } from '../types';
+import { AIPromptEditor } from '../components/AIPromptEditor';
 
 const PAGE_SIZE = 10;
 
@@ -68,6 +69,8 @@ export function SummarizePage() {
     <div className="container">
       <h2 style={{ marginTop: 0 }}>記事の要約</h2>
       <p style={{ color: 'var(--muted)', fontSize: 15 }}>複数の記事を選択してAIに要約させ、まとめレポートに使えます。</p>
+
+      <AIPromptEditor />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button className={'btn ' + (source === 'bookmark' ? '' : 'btn-ghost')} onClick={() => setSource('bookmark')}>ブックマークから</button>

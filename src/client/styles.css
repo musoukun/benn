@@ -88,6 +88,56 @@
 /* Milkdown Crepe のプレースホルダ — デフォルトはライト想定の薄色なのでダーク時に明るく上書き */
 [data-theme="dark"] .milkdown .crepe-placeholder::before { color: #94a3b8; }
 
+/* Milkdown Crepe のコードブロック (frame テーマはライト固定、内部は CodeMirror 6) — ダークで読み辛いので上書き */
+[data-theme="dark"] .milkdown milkdown-code-block,
+[data-theme="dark"] .milkdown .milkdown-code-block {
+  background: #0f172a !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}
+[data-theme="dark"] .milkdown .cm-editor {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+[data-theme="dark"] .milkdown .cm-editor .cm-content,
+[data-theme="dark"] .milkdown .cm-editor .cm-line {
+  color: #e2e8f0 !important;
+  caret-color: #e2e8f0 !important;
+}
+[data-theme="dark"] .milkdown .cm-editor .cm-gutters {
+  background: #0b1220 !important;
+  color: #64748b !important;
+  border-right: 1px solid #1f2a3f !important;
+}
+[data-theme="dark"] .milkdown .cm-editor .cm-activeLine,
+[data-theme="dark"] .milkdown .cm-editor .cm-activeLineGutter {
+  background: rgba(148,163,184,.08) !important;
+}
+[data-theme="dark"] .milkdown .cm-editor .cm-cursor {
+  border-left-color: #e2e8f0 !important;
+}
+[data-theme="dark"] .milkdown .cm-editor .cm-selectionBackground,
+[data-theme="dark"] .milkdown .cm-editor ::selection {
+  background: rgba(95,207,220,.25) !important;
+}
+/* 言語セレクタ / プレビュートグル等のコードブロック UI */
+[data-theme="dark"] .milkdown milkdown-code-block .language-picker,
+[data-theme="dark"] .milkdown .milkdown-code-block .language-picker,
+[data-theme="dark"] .milkdown milkdown-code-block button,
+[data-theme="dark"] .milkdown .milkdown-code-block button {
+  background: #1f2a3f !important;
+  color: #e2e8f0 !important;
+  border-color: var(--border) !important;
+}
+/* インラインコード (ProseMirror 側) もダークで見やすく */
+[data-theme="dark"] .milkdown .ProseMirror code {
+  background: #1f2a3f !important;
+  color: #f1d6a8 !important;
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
 /* 代表者なしコミュニティの注釈ボックス */
 .community-no-owner-note {
   margin: 10px 0 12px;

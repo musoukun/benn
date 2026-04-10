@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { AggregationTemplate, ArticleListItem } from '../types';
+import { AIPromptEditor } from '../components/AIPromptEditor';
 
 export function AggregatePage() {
   const nav = useNavigate();
@@ -81,6 +82,8 @@ export function AggregatePage() {
     <div className="container">
       <h2 style={{ marginTop: 0 }}>まとめ記事作成</h2>
       <p style={{ color: 'var(--muted)', fontSize: 15 }}>複数の記事を1つのまとめ記事にします。テンプレート内の <code>{'{{articles}}'}</code> が記事ブロックに置換されます。</p>
+
+      <AIPromptEditor />
 
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>テンプレート</h3>
