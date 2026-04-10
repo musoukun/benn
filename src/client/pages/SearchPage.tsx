@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { Avatar } from '../components/Avatar';
 
-type Tab = 'article' | 'community' | 'post';
+type Tab = 'article' | 'community' | 'post' | 'user';
 
 export function SearchPage() {
   const [params, setParams] = useSearchParams();
@@ -74,6 +74,9 @@ export function SearchPage() {
         <button className={tab === 'community' ? 'active' : ''} onClick={() => switchTab('community')}>
           🌐 コミュニティ
         </button>
+        <button className={tab === 'user' ? 'active' : ''} onClick={() => switchTab('user')}>
+          👤 ユーザ
+        </button>
         <button className={tab === 'post' ? 'active' : ''} onClick={() => switchTab('post')}>
           💬 SNS 投稿
         </button>
@@ -95,7 +98,13 @@ export function SearchPage() {
 }
 
 function labelOf(t: Tab): string {
-  return t === 'article' ? '記事' : t === 'community' ? 'コミュニティ' : 'SNS 投稿';
+  return t === 'article'
+    ? '記事'
+    : t === 'community'
+    ? 'コミュニティ'
+    : t === 'user'
+    ? 'ユーザ'
+    : 'SNS 投稿';
 }
 
 function renderItem(tab: Tab, it: any) {
@@ -110,6 +119,24 @@ function renderItem(tab: Tab, it: any) {
             {it.author && <span>by {it.author.name}</span>}
             <span>♥ {it.likeCount || 0}</span>
           </div>
+        </div>
+      </Link>
+    );
+  }
+  if (tab === 'user') {
+    return (
+      <Link
+        key={it.id}
+        to={`/users/${it.id}`}
+        className="article-card"
+        style={{ textDecoration: 'none', color: 'inherit', alignItems: 'center' }}
+      >
+        <Avatar user={{ name: it.name || '?', avatarUrl: it.avatarUrl || null }} />
+        <div className="article-meta">
+          <div className="article-title">{it.name}</div>
+          {it.bio && (
+            <div style={{ marginTop: 4, color: 'var(--muted)', fontSize: 14 }}>{it.bio}</div>
+          )}
         </div>
       </Link>
     );

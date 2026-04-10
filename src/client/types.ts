@@ -4,6 +4,7 @@ export type User = {
   name: string;
   avatarUrl: string | null;
   bio: string | null;
+  isAdmin?: boolean;
   createdAt?: string;
 };
 
@@ -68,8 +69,10 @@ export type CommunitySummary = {
   name: string;
   slug: string;
   description: string | null;
+  avatarUrl: string | null;
   visibility: 'public' | 'private';
   memberCount: number;
+  ownerCount: number;
   isMember: boolean;
 };
 
@@ -135,6 +138,7 @@ export type CommunityFull = {
   name: string;
   slug: string;
   description: string | null;
+  avatarUrl: string | null;
   visibility: 'public' | 'private';
   members: CommunityMember[];
   timelines: CommunityTimeline[];

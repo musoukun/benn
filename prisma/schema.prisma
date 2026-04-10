@@ -15,6 +15,8 @@ model User {
   passwordHash String
   avatarUrl    String?
   bio          String?
+  // 管理者フラグ。初回 /admin-setting で作成した代表アカウントが true になる。
+  isAdmin      Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   articles         Article[]
@@ -24,6 +26,7 @@ model User {
   sessions         Session[]
   affiliations     UserAffiliation[]
   communityMembers CommunityMember[]
+  communityLeftLogs CommunityLeftLog[]
   aiConfigs        UserAIConfig[]
   aiPrompts        UserAIPrompt[]
   aggTemplates     AggregationTemplate[]
@@ -177,11 +180,13 @@ model Community {
   name        String
   slug        String   @unique
   description String?
+  avatarUrl   String?  // コミュニティアイコン (画像 URL)。未設定なら頭文字フォールバック
   // "public" | "private" — private は非メンバーから存在を隠す
   visibility  String   @default("private")
   createdAt   DateTime @default(now())
 
   members   CommunityMember[]
+  leftLogs  CommunityLeftLog[]
   invites   CommunityInvite[]
   timelines CommunityTimeline[]
   articles  Article[]
@@ -199,6 +204,22 @@ model CommunityMember {
 
   @@id([userId, communityId])
   @@index([communityId])
+}
+
+// 過去に private コミュニティを脱退した履歴。
+// private コミュニティは非メンバーから存在を隠すため、脱退すると一覧から消えてしまう。
+// 「設定 > プライベートコミュニティ」タブで自分が抜けた private コミュニティだけ
+// 再表示・再参加できるようにするためのテーブル。
+model CommunityLeftLog {
+  id          String   @id @default(cuid())
+  userId      String
+  communityId String
+  leftAt      DateTime @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, communityId])
+  @@index([userId])
 }
 
 model CommunityInvite {

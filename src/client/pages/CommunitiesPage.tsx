@@ -36,11 +36,22 @@ export function CommunitiesPage() {
 
   const renderCard = (c: CommunitySummary) => (
     <Link to={`/communities/${c.id}`} key={c.id} className="article-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div className="article-emoji">{c.visibility === 'private' ? '🔒' : '🌐'}</div>
+      {c.avatarUrl ? (
+        <span className="avatar lg avatar-img" style={{ flexShrink: 0 }}>
+          <img src={c.avatarUrl} alt={c.name} />
+        </span>
+      ) : (
+        <div className="article-emoji">{c.visibility === 'private' ? '🔒' : '🌐'}</div>
+      )}
       <div className="article-meta">
         <div className="article-title">{c.name}</div>
         <div className="article-sub">
           <span>{c.memberCount} メンバー</span>
+          {c.ownerCount === 0 && (
+            <span className="badge badge-no-owner" title="代表者が不在です。活動停止中の可能性があります">
+              👻 代表者なし
+            </span>
+          )}
           {c.isMember && <span className={`badge ${c.visibility === 'private' ? 'badge-private' : 'badge-public'}`}>参加中</span>}
         </div>
         {c.description && <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 15 }}>{c.description}</div>}

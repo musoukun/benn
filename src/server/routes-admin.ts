@@ -1,0 +1,207 @@
+import { Hono } from 'hono';
+import type { MiddlewareHandler } from 'hono';
+import { setCookie } from 'hono/cookie';
+import type { User } from '@prisma/client';
+import { prisma } from './db';
+import { requireAuth } from './auth';
+import { hashPassword } from './password';
+import { createSession, SESSION_COOKIE } from './session';
+
+export const adminRoutes = new Hono<{ Variables: { user: User | null } }>();
+
+// ---- 管理者必須 middleware ----
+const requireAdmin: MiddlewareHandler = async (c, next) => {
+  const user = c.get('user') as User | null;
+  if (!user) return c.json({ error: 'not logged in' }, 401);
+  if (!user.isAdmin) return c.json({ error: '管理者権限が必要です' }, 403);
+  await next();
+};
+
+// ---- 管理者がまだ存在しないか? (公開) ----
+adminRoutes.get('/exists', async (c) => {
+  const count = await prisma.user.count({ where: { isAdmin: true } });
+  return c.json({ exists: count > 0 });
+});
+
+// ---- 初回管理者作成 (公開、ただし既に存在すれば 409) ----
+adminRoutes.post('/init', async (c) => {
+  const existing = await prisma.user.count({ where: { isAdmin: true } });
+  if (existing > 0) {
+    return c.json({ error: '管理者は既に存在します。ログイン画面からログインしてください。' }, 409);
+  }
+  const body = await c.req.json<{ email?: string; password?: string; name?: string }>();
+  const email = String(body.email || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  const name = String(body.name || '管理者').trim().slice(0, 50) || '管理者';
+  if (!email || !email.includes('@')) return c.json({ error: 'メールアドレスが不正です' }, 400);
+  if (password.length < 8) return c.json({ error: 'パスワードは8文字以上必要です' }, 400);
+
+  const dup = await prisma.user.findUnique({ where: { email } });
+  if (dup) {
+    // 既存ユーザを管理者に昇格 (パスワードは変更しない)
+    if (dup.passwordHash) {
+      const promoted = await prisma.user.update({
+        where: { id: dup.id },
+        data: { isAdmin: true },
+      });
+      const session = await createSession(promoted.id);
+      setCookie(c, SESSION_COOKIE, session.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax',
+        path: '/',
+        expires: session.expiresAt,
+      });
+      const { passwordHash: _, ...safe } = promoted;
+      return c.json({ ...safe, promoted: true });
+    }
+    return c.json({ error: 'このメールアドレスは既に登録されています' }, 409);
+  }
+
+  const passwordHash = await hashPassword(password);
+  const created = await prisma.user.create({
+    data: { email, name, passwordHash, isAdmin: true },
+  });
+  const session = await createSession(created.id);
+  setCookie(c, SESSION_COOKIE, session.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    path: '/',
+    expires: session.expiresAt,
+  });
+  const { passwordHash: _, ...safe } = created;
+  return c.json(safe);
+});
+
+// ---- /me が管理者か? (要ログイン) ----
+adminRoutes.get('/me', requireAuth, async (c) => {
+  const user = c.get('user')!;
+  return c.json({ isAdmin: !!user.isAdmin });
+});
+
+// ---- ユーザ一覧 (管理者) ----
+adminRoutes.get('/users', requireAdmin, async (c) => {
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      avatarUrl: true,
+      isAdmin: true,
+      createdAt: true,
+      affiliations: { include: { affiliation: true } },
+    },
+  });
+  return c.json(
+    users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      avatarUrl: u.avatarUrl,
+      isAdmin: u.isAdmin,
+      createdAt: u.createdAt,
+      affiliations: u.affiliations.map((a) => ({
+        id: a.affiliation.id,
+        name: a.affiliation.name,
+      })),
+    }))
+  );
+});
+
+// ---- ユーザの所属を上書き設定 (管理者) ----
+adminRoutes.put('/users/:id/affiliations', requireAdmin, async (c) => {
+  const id = c.req.param('id');
+  const { affiliationIds } = await c.req.json<{ affiliationIds: string[] }>();
+  const ids = (affiliationIds || []).slice(0, 50);
+  await prisma.userAffiliation.deleteMany({ where: { userId: id } });
+  if (ids.length > 0) {
+    await prisma.userAffiliation.createMany({
+      data: ids.map((aid) => ({ userId: id, affiliationId: aid })),
+    });
+  }
+  return c.json({ ok: true });
+});
+
+// ---- ユーザ削除 (管理者) ----
+adminRoutes.delete('/users/:id', requireAdmin, async (c) => {
+  const me = c.get('user')!;
+  const id = c.req.param('id');
+  if (id === me.id) return c.json({ error: '自分自身は削除できません' }, 400);
+  // 他に管理者がいない & 削除対象が管理者なら拒否
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) return c.json({ error: 'ユーザが見つかりません' }, 404);
+  if (target.isAdmin) {
+    const otherAdmins = await prisma.user.count({
+      where: { isAdmin: true, id: { not: id } },
+    });
+    if (otherAdmins === 0) {
+      return c.json({ error: '最後の管理者は削除できません' }, 400);
+    }
+  }
+  await prisma.user.delete({ where: { id } });
+  return c.json({ ok: true });
+});
+
+// ---- 全コミュニティ一覧 (管理者: 投稿は含めない) ----
+adminRoutes.get('/communities', requireAdmin, async (c) => {
+  const all = await prisma.community.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      _count: { select: { members: true } },
+    },
+  });
+  const ownerRows = await prisma.communityMember.groupBy({
+    by: ['communityId'],
+    where: { role: 'owner' },
+    _count: { _all: true },
+  });
+  const ownerMap = new Map(ownerRows.map((r) => [r.communityId, r._count._all]));
+  return c.json(
+    all.map((c2) => ({
+      id: c2.id,
+      name: c2.name,
+      slug: c2.slug,
+      description: c2.description,
+      avatarUrl: c2.avatarUrl,
+      visibility: c2.visibility,
+      memberCount: c2._count.members,
+      ownerCount: ownerMap.get(c2.id) || 0,
+      createdAt: c2.createdAt,
+    }))
+  );
+});
+
+// ---- コミュニティ削除 (管理者) ----
+adminRoutes.delete('/communities/:id', requireAdmin, async (c) => {
+  const id = c.req.param('id');
+  await prisma.community.delete({ where: { id } });
+  return c.json({ ok: true });
+});
+
+// ---- 既存の affiliation 一覧 (管理者) ----
+// ---- 新規作成 (管理者) ----
+adminRoutes.post('/affiliations', requireAdmin, async (c) => {
+  const { name } = await c.req.json<{ name: string }>();
+  const trimmed = String(name || '').trim().slice(0, 40);
+  if (!trimmed) return c.json({ error: 'name は必須です' }, 400);
+  const slug =
+    trimmed
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9\-_]/g, '')
+      .slice(0, 40) || 'team';
+  const existing = await prisma.affiliation.findFirst({
+    where: { OR: [{ name: trimmed }, { slug }] },
+  });
+  if (existing) return c.json(existing);
+  const created = await prisma.affiliation.create({ data: { name: trimmed, slug } });
+  return c.json(created);
+});
+
+adminRoutes.delete('/affiliations/:id', requireAdmin, async (c) => {
+  const id = c.req.param('id');
+  await prisma.affiliation.delete({ where: { id } });
+  return c.json({ ok: true });
+});

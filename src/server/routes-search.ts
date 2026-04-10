@@ -82,6 +82,19 @@ searchRoutes.get('/', async (c) => {
     });
   }
 
+  if (type === 'user') {
+    if (!me) return c.json({ items: [] });
+    const items = await prisma.user.findMany({
+      where: {
+        OR: [{ name: { contains: q } }, { email: { contains: q } }],
+      },
+      orderBy: { name: 'asc' },
+      take: 20,
+      select: { id: true, name: true, avatarUrl: true, bio: true },
+    });
+    return c.json({ items });
+  }
+
   if (type === 'post') {
     // 自分が所属している community の post のみ検索可
     if (!me) return c.json({ items: [] });

@@ -5,6 +5,8 @@ import type { ArticleListItem, CommunityFull, Post } from '../types';
 import { Avatar } from '../components/Avatar';
 import { PostCard } from '../components/PostCard';
 import { PostComposer } from '../components/PostComposer';
+import { CommunityIconEditor } from '../components/CommunityIconEditor';
+import { CommunityMemberPicker } from '../components/CommunityMemberPicker';
 
 type Tab = 'timeline' | 'members' | 'pending' | 'invite' | 'settings';
 
@@ -24,7 +26,6 @@ export function CommunityPage() {
   const [newTimelineVis, setNewTimelineVis] = useState<'public' | 'members_only' | 'affiliation_in'>('members_only');
   const [inviteEmail, setInviteEmail] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  const [transferOpen, setTransferOpen] = useState(false);
 
   const reload = useCallback(() => {
     api
@@ -162,66 +163,43 @@ export function CommunityPage() {
     }
   };
 
-  const removeMember = async (userId: string, name: string, role: string) => {
-    // 自分自身が最後の owner なら譲渡 modal
-    if (userId === c.members.find((m) => m.role === c.myRole && m.id === userId)?.id && role === 'owner' && ownerCount === 1) {
-      setTransferOpen(true);
-      return;
-    }
+  const removeMember = async (userId: string, name: string, _role: string) => {
     if (!confirm(`${name} を脱退/削除しますか？`)) return;
     try {
       await api.removeMember(c.id, userId);
       reload();
     } catch (e) {
-      if (e instanceof ApiError && e.body?.error === 'last_owner') {
-        setTransferOpen(true);
-      } else {
-        setToast(e instanceof Error ? e.message : '失敗しました');
-      }
+      setToast(e instanceof Error ? e.message : '失敗しました');
+    }
+  };
+
+  // 「コミュニティに参加」ボタン (public コミュニティ向けの直接参加)
+  const joinCommunity = async () => {
+    try {
+      await api.joinCommunity(c.id);
+      setToast('コミュニティに参加しました');
+      reload();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '参加に失敗しました');
     }
   };
 
   // 「コミュニティから脱退」ボタン (ヘッダから自分自身が抜ける用)
+  // 仕様: 最後の代表でも譲渡を強制せず、そのまま脱退できる。
+  // 代表者ゼロのコミュニティは「代表者なし (活動停止)」として残る。
   const leaveCommunity = async () => {
     if (!meId) return;
-    // 自分が最後の owner なら譲渡モーダルへ
-    if (isOwner && ownerCount === 1) {
-      setTransferOpen(true);
-      return;
-    }
-    if (!confirm(`「${c.name}」から脱退しますか？`)) return;
+    const lastOwnerWarning =
+      isOwner && ownerCount === 1
+        ? '\n\n※ あなたは最後の代表です。脱退するとこのコミュニティは「代表者なし」状態になります。'
+        : '';
+    if (!confirm(`「${c.name}」から脱退しますか？${lastOwnerWarning}`)) return;
     try {
       await api.removeMember(c.id, meId);
       setToast('コミュニティを脱退しました');
       nav('/communities');
     } catch (e) {
-      if (e instanceof ApiError && e.body?.error === 'last_owner') {
-        setTransferOpen(true);
-      } else {
-        setToast(e instanceof Error ? e.message : '脱退に失敗しました');
-      }
-    }
-  };
-
-  const transferAndLeave = async (toUserId: string) => {
-    try {
-      await api.setMemberRole(c.id, toUserId, 'owner');
-      // 自分を削除
-      const meId = c.members.find((m) => m.role === c.myRole)?.id; // owner=自分
-      // c.myRole === 'owner' のはず。自分の id を members から探す必要がある
-      // (members には id=userId が入っている)
-      // 実際は: 自分の userId は API レスポンスにはないので、いったん再取得して role 比較
-      const fresh = await api.getCommunity(c.id);
-      const myself = fresh.members.find((m) => m.id !== toUserId && m.role === 'owner') ||
-                      fresh.members.find((m) => m.role === 'owner');
-      // フォールバック: 自分は最初に「myRole==owner」だった人。もう一段確実にするため /api/me 経由で id 取る
-      const me = await api.getMe();
-      if (me) await api.removeMember(c.id, me.id);
-      setTransferOpen(false);
-      setToast('代表を譲渡し、コミュニティを脱退しました');
-      nav('/communities');
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : '譲渡に失敗しました');
+      setToast(e instanceof Error ? e.message : '脱退に失敗しました');
     }
   };
 
@@ -250,11 +228,18 @@ export function CommunityPage() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar user={{ name: c.name, avatarUrl: c.avatarUrl }} size="lg" />
           <h2 style={{ margin: 0, flex: 1 }}>{c.name}</h2>
           <span className={`badge badge-${c.visibility}`}>
             {c.visibility === 'private' ? '🔒 限定' : '🌐 公開'}
           </span>
         </div>
+        {ownerCount === 0 && (
+          <div className="community-no-owner-note" role="note">
+            👻 このコミュニティは <strong>代表者がいません</strong>。活動をしていない可能性があります。
+            メンバーが残っていれば自由に投稿できますが、新しい招待やタイムラインの管理を行うには代表者が必要です。
+          </div>
+        )}
         {c.description && <p style={{ color: 'var(--muted)', marginBottom: 8 }}>{c.description}</p>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ color: 'var(--muted)', fontSize: 15 }}>{c.members.length} メンバー</span>
@@ -263,7 +248,9 @@ export function CommunityPage() {
               あなた: {c.myRole === 'owner' ? '代表' : 'メンバー'}
             </span>
           ) : (
-            <span className="badge badge-outsider">未参加 / 招待リンクが必要です</span>
+            <span className="badge badge-outsider">
+              {c.visibility === 'public' ? '未参加' : '未参加 / 招待リンクが必要です'}
+            </span>
           )}
           {isMember && (
             <>
@@ -279,12 +266,23 @@ export function CommunityPage() {
                 className="btn btn-ghost"
                 onClick={leaveCommunity}
                 title={isOwner && ownerCount === 1
-                  ? '最後の代表のため、譲渡先を選んでから脱退します'
+                  ? '最後の代表ですが、そのまま脱退できます (コミュニティは「代表者なし」になります)'
                   : 'このコミュニティから脱退する'}
               >
                 🚪 脱退
               </button>
             </>
+          )}
+          {!isMember && c.visibility === 'public' && (
+            <button
+              type="button"
+              className="btn"
+              style={{ marginLeft: 'auto' }}
+              onClick={joinCommunity}
+              title="このコミュニティに参加する"
+            >
+              🤝 参加する
+            </button>
           )}
         </div>
       </div>
@@ -512,7 +510,16 @@ export function CommunityPage() {
       )}
 
       {tab === 'settings' && isOwner && (
-        <div className="card">
+        <CommunityIconEditor
+          community={{ id: c.id, name: c.name, avatarUrl: c.avatarUrl }}
+          onUpdated={() => reload()}
+        />
+      )}
+      {tab === 'settings' && isOwner && (
+        <CommunityMemberPicker community={c} onAdded={() => reload()} />
+      )}
+      {tab === 'settings' && isOwner && (
+        <div className="card" style={{ marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>公開範囲</h3>
           <div style={{ marginBottom: 16 }}>
             <select
@@ -562,49 +569,6 @@ export function CommunityPage() {
         </div>
       )}
 
-      {transferOpen && (
-        <div className="modal-backdrop" onClick={() => setTransferOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>代表を譲渡してください</h3>
-            <p style={{ color: 'var(--muted)' }}>
-              コミュニティには代表(owner)が最低1名必要です。脱退するには、他のメンバーから新しい代表を選んでください。
-            </p>
-            {c.members.filter((m) => m.role !== 'owner').length === 0 ? (
-              <p style={{ color: 'var(--danger, #c0392b)' }}>
-                他にメンバーがいないため譲渡できません。脱退するには先にメンバーを招待するか、コミュニティを削除してください。
-              </p>
-            ) : (
-              <ul style={{ listStyle: 'none', padding: 0 }}>
-                {c.members
-                  .filter((m) => m.role !== 'owner')
-                  .map((m) => (
-                    <li
-                      key={m.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '8px 0',
-                        borderBottom: '1px solid var(--border)',
-                      }}
-                    >
-                      <Avatar user={{ name: m.name, avatarUrl: m.avatarUrl }} />
-                      <span style={{ flex: 1 }}>{m.name}</span>
-                      <button className="btn" onClick={() => transferAndLeave(m.id)}>
-                        この人を代表にして脱退
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            )}
-            <div style={{ marginTop: 12, textAlign: 'right' }}>
-              <button className="btn btn-ghost" onClick={() => setTransferOpen(false)}>
-                やめる
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

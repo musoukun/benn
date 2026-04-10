@@ -3,7 +3,7 @@ import { api } from '../api';
 import type { Affiliation, AIConfig } from '../types';
 import { ProfileEditor } from '../components/ProfileEditor';
 
-type Tab = 'profile' | 'affiliation' | 'ai' | 'prompts';
+type Tab = 'profile' | 'affiliation' | 'ai' | 'prompts' | 'private-communities';
 
 export function AccountSettingsPage() {
   const [tab, setTab] = useState<Tab>('profile');
@@ -16,82 +16,194 @@ export function AccountSettingsPage() {
         <button className={tab === 'affiliation' ? 'active' : ''} onClick={() => setTab('affiliation')}>所属</button>
         <button className={tab === 'ai' ? 'active' : ''} onClick={() => setTab('ai')}>AIプロバイダ</button>
         <button className={tab === 'prompts' ? 'active' : ''} onClick={() => setTab('prompts')}>プロンプト</button>
+        <button className={tab === 'private-communities' ? 'active' : ''} onClick={() => setTab('private-communities')}>
+          プライベートコミュニティ
+        </button>
       </div>
       {tab === 'profile' && <ProfileEditor />}
       {tab === 'affiliation' && <AffiliationSection />}
       {tab === 'ai' && <AIConfigSection />}
       {tab === 'prompts' && <PromptSection />}
+      {tab === 'private-communities' && <PrivateCommunitiesSection />}
     </div>
   );
 }
 
-function AffiliationSection() {
-  const [all, setAll] = useState<Affiliation[]>([]);
-  const [mine, setMine] = useState<Set<string>>(new Set());
-  const [newName, setNewName] = useState('');
+// 自分が脱退した private コミュニティだけが見えるタブ。
+// 他人にはこのリストは見えない (本人専用 API)。
+function PrivateCommunitiesSection() {
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [data, setData] = useState<{
+    items: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      memberCount: number;
+      ownerCount: number;
+      leftAt: string;
+    }>;
+    total: number;
+    totalPages: number;
+  } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const reload = async () => {
-    const list = await api.listAffiliations();
-    setAll(list);
-    const me = await api.getMe();
-    if (me) {
-      const ua = await api.getUserAffiliations(me.id);
-      setMine(new Set(ua.map((a) => a.id)));
+    try {
+      const r = await api.listMyLeftPrivateCommunities(page, pageSize);
+      setData({ items: r.items, total: r.total, totalPages: r.totalPages });
+    } catch (e) {
+      setData({ items: [], total: 0, totalPages: 1 });
     }
   };
-  useEffect(() => { reload(); }, []);
 
-  const toggle = async (id: string) => {
-    const next = new Set(mine);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setMine(next);
-    await api.setMyAffiliations(Array.from(next));
-  };
-
-  const addNew = async () => {
-    if (!newName.trim()) return;
-    const a = await api.createAffiliation(newName.trim());
-    setNewName('');
-    const next = new Set(mine);
-    next.add(a.id);
-    setMine(next);
-    await api.setMyAffiliations(Array.from(next));
+  useEffect(() => {
     reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const onRejoin = async (id: string, name: string) => {
+    if (!confirm(`「${name}」に再参加しますか？`)) return;
+    setBusy(id);
+    try {
+      await api.rejoinCommunity(id);
+      setToast('再参加しました');
+      // ページ末尾の最後の1件を再参加した場合、前のページに戻す
+      if (data && data.items.length === 1 && page > 1) setPage(page - 1);
+      else reload();
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '再参加に失敗しました');
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>所属タグ</h3>
-      <p style={{ color: 'var(--muted)', fontSize: 15 }}>自分が所属するチームのタグを設定。記事公開時に閲覧範囲の指定に使えます。</p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        {all.map((a) => (
-          <button
-            key={a.id}
-            className={'tag ' + (mine.has(a.id) ? '' : '')}
-            onClick={() => toggle(a.id)}
-            style={{
-              cursor: 'pointer',
-              background: mine.has(a.id) ? 'var(--accent-soft)' : '#edf2f7',
-              color: mine.has(a.id) ? '#0f172a' : 'var(--muted)',
-              fontWeight: mine.has(a.id) ? 700 : 400,
-              border: mine.has(a.id) ? '1px solid rgba(15,23,42,.1)' : '1px solid transparent',
-              padding: '6px 14px',
-            }}
-          >
-            {a.name}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input
-          type="text"
-          placeholder="新しい所属名"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, flex: 1 }}
-        />
-        <button className="btn" onClick={addNew}>追加</button>
-      </div>
+      {toast && <div className="toast" role="status">{toast}</div>}
+      <h3 style={{ marginTop: 0 }}>脱退したプライベートコミュニティ</h3>
+      <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0 }}>
+        ここはあなただけが見られる一覧です。プライベートコミュニティを脱退すると一覧画面からは見えなくなりますが、ここから再参加できます。
+      </p>
+      {!data ? (
+        <div className="loading">読み込み中…</div>
+      ) : data.items.length === 0 ? (
+        <p style={{ color: 'var(--muted)' }}>脱退したプライベートコミュニティはありません。</p>
+      ) : (
+        <>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {data.items.map((c) => (
+              <li
+                key={c.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 0',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>🔒 {c.name}</div>
+                  {c.description && (
+                    <div style={{ color: 'var(--muted)', fontSize: 14, marginTop: 2 }}>
+                      {c.description}
+                    </div>
+                  )}
+                  <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
+                    {c.memberCount} メンバー
+                    {c.ownerCount === 0 && (
+                      <span className="badge badge-no-owner" style={{ marginLeft: 8 }}>
+                        👻 代表者なし
+                      </span>
+                    )}
+                    <span style={{ marginLeft: 8 }}>
+                      脱退日: {new Date(c.leftAt).toLocaleString('ja-JP')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  className="btn"
+                  disabled={busy === c.id}
+                  onClick={() => onRejoin(c.id, c.name)}
+                >
+                  {busy === c.id ? '処理中…' : '🤝 再参加'}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {data.totalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 16,
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                ← 前へ
+              </button>
+              <span style={{ color: 'var(--muted)', fontSize: 14 }}>
+                {page} / {data.totalPages} ページ (全 {data.total} 件)
+              </span>
+              <button
+                className="btn btn-ghost"
+                disabled={page >= data.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                次へ →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// 仕様変更: ユーザは自分の所属を変更できなくなった (管理者のみが /admin-setting から付与)。
+// このタブは「自分の所属を確認する」用の読み取り専用ビューに変更。
+function AffiliationSection() {
+  const [mine, setMine] = useState<Affiliation[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const me = await api.getMe();
+      if (me) {
+        const ua = await api.getUserAffiliations(me.id);
+        setMine(ua);
+      }
+    })();
+  }, []);
+
+  return (
+    <div className="card">
+      <h3 style={{ marginTop: 0 }}>あなたの所属</h3>
+      <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+        所属の付与・解除は管理者が行います。変更したい場合は管理者に依頼してください。
+      </p>
+      {mine.length === 0 ? (
+        <p style={{ color: 'var(--muted)' }}>(所属はありません)</p>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {mine.map((a) => (
+            <span key={a.id} className="tag" style={{ padding: '6px 14px' }}>{a.name}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

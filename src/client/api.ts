@@ -159,7 +159,12 @@ export const api = {
   getCommunity: (id: string) => req<CommunityFull>(`/communities/${id}`),
   updateCommunity: (
     id: string,
-    patch: { name?: string; description?: string; visibility?: 'public' | 'private' }
+    patch: {
+      name?: string;
+      description?: string;
+      visibility?: 'public' | 'private';
+      avatarUrl?: string | null;
+    }
   ) => req<any>(`/communities/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   setMemberRole: (id: string, userId: string, role: 'owner' | 'member') =>
     req<any>(`/communities/${id}/members/${userId}`, {
@@ -168,6 +173,42 @@ export const api = {
     }),
   removeMember: (id: string, userId: string) =>
     req<{ ok: boolean }>(`/communities/${id}/members/${userId}`, { method: 'DELETE' }),
+  addMember: (id: string, userId: string) =>
+    req<{ ok: boolean; already?: boolean }>(`/communities/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+  searchUsers: (q: string) =>
+    req<{ items: Array<{ id: string; name: string; avatarUrl: string | null }> }>(
+      `/search?type=user&q=${encodeURIComponent(q)}`
+    ),
+  joinCommunity: (id: string) =>
+    req<{ ok: boolean; already?: boolean }>(`/communities/${id}/join`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  listMyLeftPrivateCommunities: (page = 1, pageSize = 10) =>
+    req<{
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+      items: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        visibility: 'private';
+        memberCount: number;
+        ownerCount: number;
+        leftAt: string;
+      }>;
+    }>(`/communities/me/left-private?page=${page}&pageSize=${pageSize}`),
+  rejoinCommunity: (id: string) =>
+    req<{ ok: boolean }>(`/communities/${id}/rejoin`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   createInvite: (id: string, email?: string) =>
     req<{ id: string; token: string; expiresAt?: string }>(`/communities/${id}/invites`, {
       method: 'POST',
@@ -209,7 +250,7 @@ export const api = {
     req<{ liked: boolean; count: number }>(`/posts/${id}/like`, { method: 'POST' }),
 
   // ---------- 検索 ----------
-  search: (q: string, type: 'article' | 'community' | 'post') =>
+  search: (q: string, type: 'article' | 'community' | 'post' | 'user') =>
     req<{ items: any[] }>(`/search?type=${type}&q=${encodeURIComponent(q)}`),
 
   // ---------- OGP ----------
@@ -296,4 +337,55 @@ export const api = {
     articleIds: string[];
     includeSummary?: boolean;
   }) => req<{ markdown: string }>('/aggregation/render', { method: 'POST', body: JSON.stringify(input) }),
+
+  // ---------- admin ----------
+  adminExists: () => req<{ exists: boolean }>('/admin/exists'),
+  adminInit: (input: { email: string; password: string; name?: string }) =>
+    req<User & { promoted?: boolean }>('/admin/init', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  adminMe: () => req<{ isAdmin: boolean }>('/admin/me'),
+  adminListUsers: () =>
+    req<
+      Array<{
+        id: string;
+        email: string;
+        name: string;
+        avatarUrl: string | null;
+        isAdmin: boolean;
+        createdAt: string;
+        affiliations: Array<{ id: string; name: string }>;
+      }>
+    >('/admin/users'),
+  adminSetUserAffiliations: (userId: string, affiliationIds: string[]) =>
+    req<{ ok: boolean }>(`/admin/users/${userId}/affiliations`, {
+      method: 'PUT',
+      body: JSON.stringify({ affiliationIds }),
+    }),
+  adminDeleteUser: (userId: string) =>
+    req<{ ok: boolean }>(`/admin/users/${userId}`, { method: 'DELETE' }),
+  adminListCommunities: () =>
+    req<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        avatarUrl: string | null;
+        visibility: 'public' | 'private';
+        memberCount: number;
+        ownerCount: number;
+        createdAt: string;
+      }>
+    >('/admin/communities'),
+  adminDeleteCommunity: (id: string) =>
+    req<{ ok: boolean }>(`/admin/communities/${id}`, { method: 'DELETE' }),
+  adminCreateAffiliation: (name: string) =>
+    req<Affiliation>('/admin/affiliations', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  adminDeleteAffiliation: (id: string) =>
+    req<{ ok: boolean }>(`/admin/affiliations/${id}`, { method: 'DELETE' }),
 };

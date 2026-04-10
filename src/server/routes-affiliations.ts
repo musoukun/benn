@@ -44,20 +44,11 @@ affiliationRoutes.get('/users/:userId', async (c) => {
   return c.json(links.map((l) => l.affiliation));
 });
 
-// 自分の所属を更新 (置換)
+// 仕様変更: 自分の所属を自分で更新する API は廃止。
+// 所属の付与/解除は管理者だけが /api/admin/users/:id/affiliations から行う。
 affiliationRoutes.put('/me', requireAuth, async (c) => {
-  const me = c.get('user')!;
-  const { affiliationIds } = await c.req.json<{ affiliationIds: string[] }>();
-  const ids = (affiliationIds || []).slice(0, 20);
-  await prisma.userAffiliation.deleteMany({ where: { userId: me.id } });
-  if (ids.length > 0) {
-    await prisma.userAffiliation.createMany({
-      data: ids.map((aid) => ({ userId: me.id, affiliationId: aid })),
-    });
-  }
-  const items = await prisma.userAffiliation.findMany({
-    where: { userId: me.id },
-    include: { affiliation: true },
-  });
-  return c.json(items.map((l) => l.affiliation));
+  return c.json(
+    { error: '所属の変更は管理者のみが行えます。管理者にお問い合わせください。' },
+    403
+  );
 });

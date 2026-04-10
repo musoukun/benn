@@ -46,14 +46,23 @@ communityRoutes.get('/', async (c) => {
   }
   // private で非メンバーには返さない
   const visible = all.filter((c2) => c2.visibility === 'public' || myIds.has(c2.id));
+  // 各コミュニティの owner 数を一括で取得
+  const ownerRows = await prisma.communityMember.groupBy({
+    by: ['communityId'],
+    where: { role: 'owner', communityId: { in: visible.map((v) => v.id) } },
+    _count: { _all: true },
+  });
+  const ownerCountMap = new Map(ownerRows.map((r) => [r.communityId, r._count._all]));
   return c.json(
     visible.map((c2) => ({
       id: c2.id,
       name: c2.name,
       slug: c2.slug,
       description: c2.description,
+      avatarUrl: c2.avatarUrl,
       visibility: c2.visibility,
       memberCount: c2._count.members,
+      ownerCount: ownerCountMap.get(c2.id) || 0,
       isMember: myIds.has(c2.id),
     }))
   );
@@ -115,6 +124,7 @@ communityRoutes.get('/:id', async (c) => {
     name: community.name,
     slug: community.slug,
     description: community.description,
+    avatarUrl: community.avatarUrl,
     visibility: community.visibility,
     members: community.members.map((m) => ({
       id: m.userId,
@@ -131,10 +141,11 @@ communityRoutes.patch('/:id', requireAuth, async (c) => {
   const me = c.get('user')!;
   const id = c.req.param('id');
   await requireOwner(id, me.id);
-  const { name, description, visibility } = await c.req.json<{
+  const { name, description, visibility, avatarUrl } = await c.req.json<{
     name?: string;
     description?: string;
     visibility?: string;
+    avatarUrl?: string | null;
   }>();
   const updated = await prisma.community.update({
     where: { id },
@@ -142,12 +153,60 @@ communityRoutes.patch('/:id', requireAuth, async (c) => {
       ...(name !== undefined ? { name: String(name).slice(0, 60) } : {}),
       ...(description !== undefined ? { description: String(description).slice(0, 500) } : {}),
       ...(visibility === 'public' || visibility === 'private' ? { visibility } : {}),
+      ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
     },
   });
   return c.json(updated);
 });
 
+// ---------- join (public のみセルフ参加可) ----------
+
+communityRoutes.post('/:id/join', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const id = c.req.param('id');
+  const community = await prisma.community.findUnique({ where: { id } });
+  if (!community) return c.json({ error: 'コミュニティが見つかりません' }, 404);
+  if (community.visibility !== 'public') {
+    return c.json(
+      { error: 'private_only', message: '非公開コミュニティへは招待リンクからのみ参加できます' },
+      403
+    );
+  }
+  // 既メンバーなら成功扱い
+  const existing = await prisma.communityMember.findUnique({
+    where: { userId_communityId: { userId: me.id, communityId: id } },
+  });
+  if (existing) return c.json({ ok: true, already: true });
+  await prisma.communityMember.create({
+    data: { userId: me.id, communityId: id, role: 'member' },
+  });
+  return c.json({ ok: true });
+});
+
 // ---------- members ----------
+
+// owner が任意のユーザを直接メンバーに追加する (招待リンクを介さない直接追加)
+communityRoutes.post('/:id/members', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const id = c.req.param('id');
+  await requireOwner(id, me.id);
+  const { userId } = await c.req.json<{ userId: string }>();
+  if (!userId) return c.json({ error: 'userId は必須です' }, 400);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return c.json({ error: 'ユーザが見つかりません' }, 404);
+  const existing = await prisma.communityMember.findUnique({
+    where: { userId_communityId: { userId, communityId: id } },
+  });
+  if (existing) return c.json({ ok: true, already: true });
+  await prisma.communityMember.create({
+    data: { userId, communityId: id, role: 'member' },
+  });
+  // 過去の脱退ログがあれば消す
+  await prisma.communityLeftLog.deleteMany({
+    where: { userId, communityId: id },
+  });
+  return c.json({ ok: true });
+});
 
 communityRoutes.patch('/:id/members/:userId', requireAuth, async (c) => {
   const me = c.get('user')!;
@@ -157,18 +216,8 @@ communityRoutes.patch('/:id/members/:userId', requireAuth, async (c) => {
   const { role } = await c.req.json<{ role: 'owner' | 'member' }>();
   if (role !== 'owner' && role !== 'member')
     return c.json({ error: 'invalid role' }, 400);
-  // 自分自身を member に降格しようとする時は、他に owner が居ないと弾く
-  if (targetUserId === me.id && role === 'member') {
-    const otherOwners = await prisma.communityMember.count({
-      where: { communityId: id, role: 'owner', userId: { not: me.id } },
-    });
-    if (otherOwners === 0) {
-      return c.json(
-        { error: 'last_owner', message: 'コミュニティには代表(owner)が最低1名必要です。先に他のメンバーを代表に昇格してください。' },
-        400
-      );
-    }
-  }
+  // 仕様変更: 「代表が最低1名必要」というガードは廃止。
+  // 代表不在のコミュニティは UI 側で「代表者なし」と表示する。
   const updated = await prisma.communityMember.update({
     where: { userId_communityId: { userId: targetUserId, communityId: id } },
     data: { role },
@@ -181,27 +230,97 @@ communityRoutes.delete('/:id/members/:userId', requireAuth, async (c) => {
   const id = c.req.param('id');
   const targetUserId = c.req.param('userId');
   if (targetUserId !== me.id) await requireOwner(id, me.id);
-  // 最後の owner が抜けるのは禁止
   const target = await prisma.communityMember.findUnique({
     where: { userId_communityId: { userId: targetUserId, communityId: id } },
   });
   if (!target) return c.json({ error: 'not a member' }, 404);
-  if (target.role === 'owner') {
-    const otherOwners = await prisma.communityMember.count({
-      where: { communityId: id, role: 'owner', userId: { not: targetUserId } },
-    });
-    if (otherOwners === 0) {
-      return c.json(
-        {
-          error: 'last_owner',
-          message: 'このユーザーが最後の代表(owner)です。脱退するには先に他のメンバーを代表に昇格してください。',
-        },
-        400
-      );
-    }
-  }
+  // 仕様変更: 最後の代表が脱退するのを許容する。
+  // 代表不在になったコミュニティは「活動停止状態」として UI 側でラベル表示する。
   await prisma.communityMember.delete({
     where: { userId_communityId: { userId: targetUserId, communityId: id } },
+  });
+  // private コミュニティを脱退した場合、本人だけが見える left-log を残す
+  // (一覧 API では非メンバーから隠れるので、ここに記録しないと再発見できなくなる)
+  const community = await prisma.community.findUnique({ where: { id } });
+  if (community?.visibility === 'private') {
+    await prisma.communityLeftLog.upsert({
+      where: { userId_communityId: { userId: targetUserId, communityId: id } },
+      create: { userId: targetUserId, communityId: id },
+      update: { leftAt: new Date() },
+    });
+  }
+  return c.json({ ok: true });
+});
+
+// ---------- 自分が抜けた private コミュニティ (本人専用 / ページネーション付き) ----------
+
+communityRoutes.get('/me/left-private', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '10', 10) || 10));
+  const where = { userId: me.id, community: { visibility: 'private' as const } };
+  const [total, rows] = await Promise.all([
+    prisma.communityLeftLog.count({ where }),
+    prisma.communityLeftLog.findMany({
+      where,
+      orderBy: { leftAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        community: {
+          include: { _count: { select: { members: true } } },
+        },
+      },
+    }),
+  ]);
+  const ownerRows = await prisma.communityMember.groupBy({
+    by: ['communityId'],
+    where: { role: 'owner', communityId: { in: rows.map((r) => r.communityId) } },
+    _count: { _all: true },
+  });
+  const ownerMap = new Map(ownerRows.map((r) => [r.communityId, r._count._all]));
+  return c.json({
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    items: rows.map((r) => ({
+      id: r.community.id,
+      name: r.community.name,
+      slug: r.community.slug,
+      description: r.community.description,
+      avatarUrl: r.community.avatarUrl,
+      visibility: r.community.visibility,
+      memberCount: r.community._count.members,
+      ownerCount: ownerMap.get(r.community.id) || 0,
+      leftAt: r.leftAt,
+    })),
+  });
+});
+
+// 自分が以前抜けた private コミュニティへ「再参加」するための専用エンドポイント。
+// 通常 private は招待リンク必須だが、left-log がある = 過去にメンバーだった人なので
+// 本人都合で抜けた場合のリカバリとして直接戻れる。
+communityRoutes.post('/:id/rejoin', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const id = c.req.param('id');
+  const log = await prisma.communityLeftLog.findUnique({
+    where: { userId_communityId: { userId: me.id, communityId: id } },
+  });
+  if (!log) return c.json({ error: '再参加権限がありません (脱退履歴がありません)' }, 403);
+  const community = await prisma.community.findUnique({ where: { id } });
+  if (!community) return c.json({ error: 'コミュニティが見つかりません' }, 404);
+  // 既に何らかの理由で再参加済みなら冪等成功
+  const existing = await prisma.communityMember.findUnique({
+    where: { userId_communityId: { userId: me.id, communityId: id } },
+  });
+  if (!existing) {
+    await prisma.communityMember.create({
+      data: { userId: me.id, communityId: id, role: 'member' },
+    });
+  }
+  await prisma.communityLeftLog.delete({
+    where: { userId_communityId: { userId: me.id, communityId: id } },
   });
   return c.json({ ok: true });
 });
@@ -275,6 +394,10 @@ communityRoutes.post('/invites/accept', requireAuth, async (c) => {
     prisma.communityInvite.update({
       where: { id: inv.id },
       data: { acceptedAt: new Date() },
+    }),
+    // 過去に脱退していた場合は left-log を消す
+    prisma.communityLeftLog.deleteMany({
+      where: { userId: me.id, communityId: inv.communityId },
     }),
   ]);
   return c.json({ ok: true, communityId: inv.communityId });

@@ -20,6 +20,7 @@ import { SummarizePage } from './pages/SummarizePage';
 import { AggregatePage } from './pages/AggregatePage';
 import { InvitePage } from './pages/InvitePage';
 import { SearchPage } from './pages/SearchPage';
+import { AdminSettingPage } from './pages/AdminSettingPage';
 
 export function App() {
   return (
@@ -103,6 +104,7 @@ export function App() {
             </RequireAuth>
           }
         />
+        <Route path="/admin-setting" element={<AdminSettingPage />} />
         <Route
           path="/invite/:token"
           element={
