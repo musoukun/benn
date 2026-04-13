@@ -1,9 +1,4 @@
-{
-    default_sni uchi.internal
-    auto_https off
-}
-
-uchi.internal:7635 {
-    tls internal
+:7635 {
+    tls /certs/cert.pem /certs/key.pem
     reverse_proxy uchi:3000
 }
