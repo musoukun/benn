@@ -223,7 +223,7 @@ export function CommunityPage() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar user={{ name: c.name, avatarUrl: c.avatarUrl }} size="lg" />
+          <Avatar user={{ name: c.name, avatarUrl: c.avatarUrl, avatarColor: c.avatarColor }} size="lg" />
           <h2 style={{ margin: 0, flex: 1 }}>{c.name}</h2>
           <span className={`badge badge-${c.visibility}`}>
             {c.visibility === 'public'
@@ -264,7 +264,7 @@ export function CommunityPage() {
                 className="btn"
                 style={{ marginLeft: 'auto' }}
               >
-                ✏ このコミュニティに記事を書く
+                ✏ このコミュニティに投稿
               </Link>
               <button
                 type="button"
@@ -321,16 +321,6 @@ export function CommunityPage() {
               >
                 ＋ タイムライン追加
               </button>
-            )}
-            {isMember && activeTimelineId && (
-              <Link
-                to={`/editor?communityId=${c.id}&timelineId=${activeTimelineId}`}
-                className="btn btn-ghost"
-                title="このタイムラインに長文の記事を書く"
-                style={{ marginLeft: 'auto' }}
-              >
-                ✎ 記事を書く
-              </Link>
             )}
           </div>
 
@@ -501,7 +491,7 @@ export function CommunityPage() {
 
       {tab === 'settings' && isOwner && (
         <CommunityIconEditor
-          community={{ id: c.id, name: c.name, avatarUrl: c.avatarUrl }}
+          community={{ id: c.id, name: c.name, avatarUrl: c.avatarUrl, avatarColor: c.avatarColor }}
           onUpdated={() => reload()}
         />
       )}
@@ -520,7 +510,10 @@ export function CommunityPage() {
             }}
             onError={(msg) => setToast(msg)}
           />
-
+        </div>
+      )}
+      {tab === 'settings' && isOwner && (
+        <div className="card" style={{ marginTop: 16 }}>
           <TimelineManager
             community={c}
             onRemove={removeTimeline}
@@ -617,7 +610,7 @@ function CommunityVisibilityEditor({
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <h3 style={{ marginTop: 0 }}>公開範囲</h3>
+      <h3 style={{ marginTop: 0 }}>コミュニティの公開範囲を設定</h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
@@ -917,7 +910,6 @@ function TimelineManager({
               setNewVis(v);
               if (v !== 'selected_users') setNewUserIds([]);
             }}
-            style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border)' }}
           >
             {modeOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -1059,11 +1051,6 @@ function TimelineRow({
                 setVis(v);
                 if (v !== 'selected_users') { setUserIds([]); setSelectedUsers([]); }
               }}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 6,
-                border: '1px solid var(--border)',
-              }}
             >
               {modeOptions.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -1176,23 +1163,12 @@ function UserSearchPicker({
       {selectedUsers.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {selectedUsers.map((u) => (
-            <span
-              key={u.id}
-              className="tag tag-on"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', borderRadius: 999,
-                background: 'var(--accent)', color: '#fff', fontSize: 14,
-              }}
-            >
+            <span key={u.id} className="user-pick-chip">
               {u.name}
               <button
                 type="button"
                 onClick={() => onRemove(u.id)}
-                style={{
-                  background: 'none', border: 'none', color: '#fff',
-                  cursor: 'pointer', fontSize: 14, padding: '0 2px',
-                }}
+                className="user-pick-chip-x"
               >×</button>
             </span>
           ))}

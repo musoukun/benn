@@ -36,6 +36,9 @@
   background: #0f1626; color: var(--text); border-color: var(--border);
 }
 /* .btn は明るい水色背景なので、文字色は両モードとも濃い色のまま (上書きしない) */
+/* ただし ghost / danger はダーク時にボーダーと文字を明るくする */
+[data-theme="dark"] .btn-ghost { color: var(--text); border-color: rgba(95,207,220,.45); background: rgba(95,207,220,.08); }
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) { background: rgba(95,207,220,.18); }
 
 /* PublishPanel — ダークモード時はパネル全体を暗いトーンに揃える */
 [data-theme="dark"] .publish-panel {
@@ -87,6 +90,21 @@
 [data-theme="dark"] .icon-btn-danger:hover,
 [data-theme="dark"] .post-delete:hover { background: rgba(239,68,68,.18); color: #fca5a5; }
 [data-theme="dark"] .tag { background: #1f2a3f; color: #cbd5e1; border: 1px solid var(--border); }
+
+/* ユーザー選択チップ (UserSearchPicker) */
+.user-pick-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 14px;
+  background: var(--accent-soft-30); color: var(--text); border: 1px solid var(--accent);
+}
+.user-pick-chip-x {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 14px; padding: 0 2px;
+}
+.user-pick-chip-x:hover { color: var(--text); }
+[data-theme="dark"] .user-pick-chip { background: rgba(95,207,220,.15); color: #e2e8f0; border-color: rgba(95,207,220,.4); }
+[data-theme="dark"] .user-pick-chip-x { color: #94a3b8; }
+[data-theme="dark"] .user-pick-chip-x:hover { color: #e2e8f0; }
 /* Milkdown Crepe のプレースホルダ — デフォルトはライト想定の薄色なのでダーク時に明るく上書き */
 [data-theme="dark"] .milkdown .crepe-placeholder::before { color: #94a3b8; }
 
@@ -212,7 +230,21 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button { font: inherit; cursor: pointer; }
-input, textarea { font: inherit; }
+input, textarea, select { font: inherit; }
+select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+select:focus { border-color: var(--accent); outline: none; }
 
 /* Header */
 .header { background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
@@ -232,8 +264,9 @@ input, textarea { font: inherit; }
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 2px 8px rgba(95, 207, 220, 0.25);
   transition: background .15s, box-shadow .15s, transform .05s;
 }
-.btn:hover { background: rgba(168, 241, 247, 0.78); text-decoration: none; box-shadow: 0 2px 14px rgba(95, 207, 220, 0.4); }
-.btn:active { transform: translateY(1px); }
+.btn:hover:not(:disabled) { background: rgba(168, 241, 247, 0.78); text-decoration: none; box-shadow: 0 2px 14px rgba(95, 207, 220, 0.4); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 .btn-ghost {
   background: var(--accent-soft-10);
   color: var(--text);
@@ -485,6 +518,10 @@ textarea.editor-pane:focus { border-color: var(--accent); }
 .post-fold:hover { text-decoration: underline; }
 
 .post-url-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.post-url-card-wrap { position: relative; }
+.post-url-card-dismiss { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: none; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s; z-index: 1; }
+.post-url-card-wrap:hover .post-url-card-dismiss { opacity: 1; }
+.post-url-card-dismiss:hover { background: rgba(0,0,0,.7); }
 .post-url-card { display: block; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: inherit; background: #f8fafc; transition: background .15s; }
 .post-url-card:hover { background: #f1f5f9; }
 .post-url-card-host { font-size: 14px; color: var(--muted); margin-bottom: 2px; }

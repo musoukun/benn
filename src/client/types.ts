@@ -76,6 +76,7 @@ export type CommunitySummary = {
   slug: string;
   description: string | null;
   avatarUrl: string | null;
+  avatarColor: string | null;
   visibility: CommunityVisibility;
   visibilityAffiliationIds?: string;
   memberCount: number;
@@ -154,6 +155,7 @@ export type CommunityFull = {
   slug: string;
   description: string | null;
   avatarUrl: string | null;
+  avatarColor: string | null;
   visibility: CommunityVisibility;
   visibilityAffiliationIds?: string;
   members: CommunityMember[];

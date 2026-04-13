@@ -31,6 +31,17 @@ export function CommunityEditorPage() {
   // クエリパラメータから初期タイムラインを取得
   const initialTimelineId = search.get('timelineId') || '';
 
+  // 集約画面からのプリフィル
+  useEffect(() => {
+    if (search.get('prefill') === '1') {
+      const md = sessionStorage.getItem('uchi:editor-prefill');
+      if (md) {
+        setBody(md);
+        sessionStorage.removeItem('uchi:editor-prefill');
+      }
+    }
+  }, [search]);
+
   useEffect(() => {
     if (!communityId) return;
     api.getCommunity(communityId).then((c) => {

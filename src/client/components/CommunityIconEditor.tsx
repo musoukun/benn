@@ -9,7 +9,7 @@ import { Avatar } from './Avatar';
 const OUTPUT_SIZE = 512;
 const PREVIEW_SIZE = 320;
 
-type Community = { id: string; name: string; avatarUrl: string | null };
+type Community = { id: string; name: string; avatarUrl: string | null; avatarColor: string | null };
 
 export function CommunityIconEditor({
   community,
@@ -122,6 +122,39 @@ export function CommunityIconEditor({
     }
   };
 
+  // カラーピッカー
+  const [color, setColor] = useState(community.avatarColor || '#5fcfdc');
+  const [savingColor, setSavingColor] = useState(false);
+
+  const saveColor = async () => {
+    setSavingColor(true);
+    setMsg(null);
+    try {
+      await api.updateCommunity(community.id, { avatarColor: color });
+      onUpdated(community.avatarUrl ?? null); // reload
+      setMsg('アイコンの色を変更しました');
+    } catch (e: any) {
+      setMsg('失敗: ' + (e?.message || e));
+    } finally {
+      setSavingColor(false);
+    }
+  };
+
+  const resetColor = async () => {
+    setSavingColor(true);
+    setMsg(null);
+    try {
+      await api.updateCommunity(community.id, { avatarColor: null });
+      setColor('#5fcfdc');
+      onUpdated(community.avatarUrl ?? null);
+      setMsg('デフォルトの色に戻しました');
+    } catch (e: any) {
+      setMsg('失敗: ' + (e?.message || e));
+    } finally {
+      setSavingColor(false);
+    }
+  };
+
   const clearIcon = async () => {
     setSaving(true);
     setMsg(null);
@@ -197,6 +230,32 @@ export function CommunityIconEditor({
           <span style={{ fontSize: 14, color: 'var(--muted)' }}>
             画像を使わず、コミュニティ名の1文字目を表示します
           </span>
+        </div>
+      </div>
+
+      <hr style={{ margin: '20px 0', border: 'none', borderTop: '1px solid var(--border)' }} />
+
+      <div>
+        <label style={{ fontWeight: 700, fontSize: 15 }}>頭文字アイコンの背景色:</label>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, marginBottom: 8 }}>
+          文字色は背景に合わせて自動で白/黒に切り替わります
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            style={{ width: 48, height: 48, padding: 2, border: '2px solid var(--border)', borderRadius: 8, cursor: 'pointer', background: 'transparent' }}
+          />
+          <Avatar user={{ name: community.name, avatarUrl: null, avatarColor: color }} size="lg" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button className="btn" disabled={savingColor} onClick={saveColor}>
+              {savingColor ? '保存中…' : 'この色に変更'}
+            </button>
+            <button className="btn btn-ghost" disabled={savingColor} onClick={resetColor} style={{ fontSize: 13 }}>
+              デフォルトに戻す
+            </button>
+          </div>
         </div>
       </div>
 

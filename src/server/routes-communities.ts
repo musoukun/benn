@@ -323,13 +323,14 @@ communityRoutes.patch('/:id', requireAuth, async (c) => {
   const me = c.get('user')!;
   const id = c.req.param('id');
   await requireOwner(id, me.id);
-  const { name, description, visibility, visibilityAffiliationIds, avatarUrl } =
+  const { name, description, visibility, visibilityAffiliationIds, avatarUrl, avatarColor } =
     await c.req.json<{
       name?: string;
       description?: string;
       visibility?: string;
       visibilityAffiliationIds?: string[];
       avatarUrl?: string | null;
+      avatarColor?: string | null;
     }>();
   // visibility 関連のパッチ
   const visPatch: {
@@ -361,6 +362,7 @@ communityRoutes.patch('/:id', requireAuth, async (c) => {
       ...(description !== undefined ? { description: String(description).slice(0, 500) } : {}),
       ...visPatch,
       ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
+      ...(avatarColor !== undefined ? { avatarColor: avatarColor || null } : {}),
     },
   });
   return c.json(updated);

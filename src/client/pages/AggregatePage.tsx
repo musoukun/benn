@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { AggregationTemplate, ArticleListItem } from '../types';
+import type { AggregationTemplate, ArticleListItem, CommunitySummary } from '../types';
 import { AIPromptEditor } from '../components/AIPromptEditor';
 
 export function AggregatePage() {
@@ -18,14 +18,19 @@ export function AggregatePage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
 
+  // コミュニティ投稿用
+  const [communities, setCommunities] = useState<CommunitySummary[]>([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState('');
+
   useEffect(() => {
     api.listAggTemplates().then(setTemplates);
     api.myBookmarks().then(setArticles).catch(() => setArticles([]));
+    api.listCommunities().then((list) => setCommunities(list.filter((c) => c.isMember))).catch(() => {});
   }, []);
 
   const reloadTpl = () => api.listAggTemplates().then(setTemplates);
 
-  const search = async () => {
+  const search_ = async () => {
     const r = await api.listArticles({ q, limit: 200 });
     setArticles(r);
     setPage(0);
@@ -58,7 +63,8 @@ export function AggregatePage() {
     }
   };
 
-  const render = async () => {
+  // markdown を生成して sessionStorage に保存
+  const renderAndNavigate = async (dest: string) => {
     if (picked.size === 0) return alert('1件以上選択してください');
     setBusy(true);
     try {
@@ -68,14 +74,22 @@ export function AggregatePage() {
         articleIds: Array.from(picked),
         includeSummary,
       });
-      // 結果をエディタに渡す (sessionStorage 経由)
       sessionStorage.setItem('uchi:editor-prefill', r.markdown);
-      nav('/editor?prefill=1');
+      nav(dest);
     } catch (e: any) {
       alert(e.message);
     } finally {
       setBusy(false);
     }
+  };
+
+  // 通常記事として作成
+  const renderAsArticle = () => renderAndNavigate('/editor?prefill=1');
+
+  // コミュニティ投稿として作成
+  const renderAsCommunityPost = () => {
+    if (!selectedCommunityId) return alert('投稿先コミュニティを選んでください');
+    renderAndNavigate(`/communities/${selectedCommunityId}/editor?prefill=1`);
   };
 
   return (
@@ -88,7 +102,7 @@ export function AggregatePage() {
       <div className="card" style={{ marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>テンプレート</h3>
         <select value={selectedTpl} onChange={(e) => loadTpl(e.target.value)}
-          style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8 }}>
+          style={{ marginBottom: 8 }}>
           <option value="">(新規)</option>
           {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
@@ -113,10 +127,10 @@ export function AggregatePage() {
             placeholder="検索"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search()}
+            onKeyDown={(e) => e.key === 'Enter' && search_()}
             style={{ padding: 8, border: '1px solid var(--border)', borderRadius: 6, flex: 1 }}
           />
-          <button className="btn" onClick={search}>検索</button>
+          <button className="btn" onClick={search_}>検索</button>
           <button
             className="btn btn-ghost"
             onClick={() => {
@@ -191,9 +205,52 @@ export function AggregatePage() {
         </label>
       </div>
 
-      <button className="btn" disabled={busy || picked.size === 0} onClick={render}>
-        {busy ? '生成中…' : 'まとめ記事を作る'}
-      </button>
+      {/* ========== 2つのアクションボタン ========== */}
+      <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {/* 通常記事 */}
+        <button
+          className="btn"
+          disabled={busy || picked.size === 0}
+          onClick={renderAsArticle}
+          style={{ minWidth: 180 }}
+        >
+          {busy ? '生成中…' : 'まとめ記事を作る'}
+        </button>
+
+        {/* コミュニティ投稿 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select
+              value={selectedCommunityId}
+              onChange={(e) => setSelectedCommunityId(e.target.value)}
+              style={{ minWidth: 200 }}
+            >
+              <option value="">コミュニティを選択…</option>
+              {communities.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              className="btn"
+              disabled={busy || picked.size === 0 || !selectedCommunityId}
+              onClick={renderAsCommunityPost}
+              style={{
+                minWidth: 200,
+                border: '2px solid var(--accent)',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {busy ? '生成中…' : 'まとめコミュニティ投稿を作る'}
+            </button>
+          </div>
+          {communities.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              参加中のコミュニティがありません
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -88,6 +88,16 @@ $env:E2E_GEMINI_KEY="..."; npm run test:e2e   # AI機能含む全テスト
 - **Hono CSRF middleware** は body 無しの POST で Origin 検査に引っかかることがある。Playwright `page.request.post` で body 無しの呼び出しは `{ data: {} }` を渡す
 - **markdown-it の `<?` 文字** は historically GAS HtmlService と衝突したが現行構成では関係ない。気にしなくて良い
 
+## 修正時のルール
+
+- **disabled ボタンは見た目も変える**: `disabled` 属性だけでなく CSS (`.btn:disabled`) で opacity/cursor を必ず適用する。押せないだけで見た目が同じは NG。
+- **インラインスタイルよりグローバル CSS**: `<select>` や `<input>` にインラインで border/padding を書かない。グローバルの CSS ルールで統一する。
+- **コミュニティ画面に通常記事 UI を混ぜない**: コミュニティ内は Post (SNS 投稿) の世界。「✏ 記事を書く」等の通常 Article 向け UI はコミュニティ画面に表示しない。
+- **コミュニティ選択はプルダウン**: コミュニティの数が増えることを想定し、モーダル一覧ではなく `<select>` プルダウンで選択させる。
+- **ダークモードで色付き背景+白文字を使わない**: `var(--accent)` 背景 + `#fff` 文字はダークモードで見づらい。代わりに薄い半透明背景 (`rgba(...)`) + `var(--text)` を使う。色を付けたい要素は CSS クラスに切り出し、`[data-theme="dark"]` で別途指定する。
+- **設定画面の見出しには主語を付ける**: 「公開範囲」→「コミュニティの公開範囲を設定」のように、何の設定かを明示する。
+- **異なる機能は別カード (card) に分ける**: 公開範囲とタイムライン管理のように独立した機能を同一 card に詰め込まない。
+
 ## デプロイ (Docker)
 
 ```bash

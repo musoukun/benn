@@ -175,6 +175,7 @@ export const api = {
       visibility?: 'public' | 'private' | 'affiliation_in' | 'affiliation_out';
       visibilityAffiliationIds?: string[];
       avatarUrl?: string | null;
+      avatarColor?: string | null;
     }
   ) => req<any>(`/communities/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   setMemberRole: (id: string, userId: string, role: 'owner' | 'member') =>

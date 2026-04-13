@@ -241,7 +241,7 @@ function AIConfigSection() {
         <div key={it.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="tag">{it.provider}</span>
           <span style={{ flex: 1 }}>{it.model} / <code>{it.apiKeyMasked}</code></span>
-          {it.isDefault ? <span className="tag" style={{ background: 'var(--accent-soft)' }}>default</span> :
+          {it.isDefault ? <span className="tag" style={{ background: 'var(--accent-soft-30)', color: 'var(--text)' }}>default</span> :
             <button className="btn btn-ghost" onClick={async () => { await api.setDefaultAIConfig(it.id); reload(); }}>default に設定</button>}
           <button className="btn btn-danger" onClick={async () => { if (confirm('削除しますか?')) { await api.deleteAIConfig(it.id); reload(); } }}>削除</button>
         </div>
@@ -252,11 +252,10 @@ function AIConfigSection() {
         <select value={provider} onChange={(e) => {
           const p = e.target.value as any;
           setProvider(p);
-          // 当面はモデル切替UIを出さず、各社固定のおすすめモデルを採用する
           if (p === 'openai') setModel('gpt-5-mini');
           if (p === 'anthropic') setModel('claude-sonnet-4-6');
           if (p === 'gemini') setModel('gemini-2.5-flash');
-        }} style={{ padding: 8, borderRadius: 6, border: '1px solid var(--border)' }}>
+        }}>
           <option value="gemini">Gemini (gemini-2.5-flash)</option>
           <option value="openai">OpenAI (gpt-5-mini)</option>
           <option value="anthropic">Anthropic (claude-sonnet-4-6)</option>

@@ -22,10 +22,17 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('ja-JP');
 }
 
-// 本文から URL だけ抽出してカード一覧化 (OGP は Phase 4 で取得。今は素朴な UrlCard)
+// 本文から URL だけ抽出してカード一覧化
+// Markdown の画像 ![alt](url) 内の URL は除外する
+const IMG_URL_RE = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
 function extractUrls(body: string): string[] {
+  // まず画像URLを収集して除外セットにする
+  const imgUrls = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = IMG_URL_RE.exec(body)) !== null) imgUrls.add(m[1]);
+  IMG_URL_RE.lastIndex = 0;
   const urls = body.match(URL_RE) || [];
-  return Array.from(new Set(urls)).slice(0, 3);
+  return Array.from(new Set(urls)).filter((u) => !imgUrls.has(u)).slice(0, 3);
 }
 
 export function PostCard({
@@ -41,9 +48,10 @@ export function PostCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set());
   const isLong = post.body.length > FOLD_LENGTH;
   const shown = !isLong || expanded ? post.body : post.body.slice(0, FOLD_LENGTH) + '…';
-  const urls = extractUrls(post.body);
+  const urls = extractUrls(post.body).filter((u) => !dismissedUrls.has(u));
   const html = renderMd(shown);
 
   const onLike = async () => {
@@ -92,7 +100,18 @@ export function PostCard({
       {urls.length > 0 && (
         <div className="post-url-cards">
           {urls.map((u) => (
-            <OgpUrlCard key={u} url={u} />
+            <div key={u} className="post-url-card-wrap">
+              <OgpUrlCard url={u} />
+              <button
+                type="button"
+                className="post-url-card-dismiss"
+                onClick={() => setDismissedUrls((s) => new Set(s).add(u))}
+                title="このカードを閉じる"
+                aria-label="OGPカードを閉じる"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}

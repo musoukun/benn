@@ -77,7 +77,7 @@ export function CommunityMemberPicker({
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <h3 style={{ marginTop: 0 }}>メンバーを直接追加</h3>
+      <h3 style={{ marginTop: 0 }}>コミュニティにメンバーを追加</h3>
       <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0 }}>
         ユーザを検索して、コミュニティに直接追加できます。招待リンクを送る代わりに使えます。
       </p>
