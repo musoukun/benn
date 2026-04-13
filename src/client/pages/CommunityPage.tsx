@@ -18,7 +18,7 @@ import { PostComposer } from '../components/PostComposer';
 import { CommunityIconEditor } from '../components/CommunityIconEditor';
 import { CommunityMemberPicker } from '../components/CommunityMemberPicker';
 
-type Tab = 'timeline' | 'members' | 'pending' | 'invite' | 'settings';
+type Tab = 'timeline' | 'trending' | 'members' | 'pending' | 'invite' | 'settings';
 
 export function CommunityPage() {
   const { id = '' } = useParams();
@@ -301,6 +301,7 @@ export function CommunityPage() {
 
       <div className="tabs">
         <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>タイムライン</button>
+        <button className={tab === 'trending' ? 'active' : ''} onClick={() => setTab('trending')}>🔥 トレンド</button>
         <button className={tab === 'members' ? 'active' : ''} onClick={() => setTab('members')}>メンバー</button>
         {isOwner && <button className={tab === 'pending' ? 'active' : ''} onClick={() => setTab('pending')}>承認待ち</button>}
         {isOwner && <button className={tab === 'invite' ? 'active' : ''} onClick={() => setTab('invite')}>招待</button>}
@@ -394,6 +395,10 @@ export function CommunityPage() {
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'trending' && (
+        <CommunityTrending communityId={id} meId={meId} />
       )}
 
       {tab === 'members' && (
@@ -1137,6 +1142,47 @@ function MemberPicker({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ---------- コミュニティ投稿トレンド ----------
+function CommunityTrending({ communityId, meId }: { communityId: string; meId: string | null }) {
+  const [items, setItems] = useState<Post[]>([]);
+  const [days, setDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api.postTrending(communityId)
+      .then((r) => { setItems(r.items || []); if (r.days) setDays(r.days); })
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [communityId]);
+
+  const onChanged = (updated: Post) => {
+    setItems((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  };
+  const onDeleted = (id: string) => {
+    setItems((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  if (loading) return <div className="loading">…</div>;
+
+  return (
+    <div>
+      <div style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 12 }}>
+        🔥 過去 {days} 日間にいいねが多かった投稿
+      </div>
+      {items.length === 0 ? (
+        <div className="empty">まだいいねが付いた投稿がありません</div>
+      ) : (
+        <div className="post-feed">
+          {items.map((p) => (
+            <PostCard key={p.id} post={p} meId={meId} onChanged={onChanged} onDeleted={onDeleted} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

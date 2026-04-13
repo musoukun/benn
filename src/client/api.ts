@@ -106,10 +106,15 @@ export const api = {
   isFollowing: (targetType: 'user' | 'topic', targetId: string) =>
     req<{ following: boolean }>(`/follows/check?targetType=${targetType}&targetId=${targetId}`),
 
-  // trending
+  // trending (articles)
   trending: (type: 'howto' | 'diary', days?: number) =>
     req<{ days: number; items: ArticleListItem[] }>(
       `/trending?type=${type}` + (days ? `&days=${days}` : '')
+    ),
+  // trending (community posts)
+  postTrending: (communityId: string, days?: number) =>
+    req<{ days: number; items: Post[] }>(
+      `/posts/trending/${communityId}` + (days ? `?days=${days}` : '')
     ),
 
   // file upload (画像 / GIF, 最大 50MB)

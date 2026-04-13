@@ -182,6 +182,59 @@ postRoutes.post('/:id/like', requireAuth, async (c) => {
   return c.json({ liked: !existing, count });
 });
 
+// コミュニティ投稿トレンド: 直近 N 日間のいいね数でランキング
+postRoutes.get('/trending/:communityId', async (c) => {
+  const me = c.get('user');
+  const communityId = c.req.param('communityId');
+  const days = Math.min(365, Math.max(1, parseInt(c.req.query('days') || '30', 10) || 30));
+  const since = new Date(Date.now() - days * 86400 * 1000);
+
+  // コミュニティ存在 + アクセス権チェック
+  const com = await prisma.community.findUnique({ where: { id: communityId } });
+  if (!com) return c.json({ error: 'not found' }, 404);
+  if (com.visibility === 'private') {
+    if (!me) return c.json({ error: 'forbidden' }, 403);
+    const m = await prisma.communityMember.findUnique({
+      where: { userId_communityId: { userId: me.id, communityId } },
+    });
+    if (!m) return c.json({ error: 'forbidden' }, 403);
+  }
+
+  // 期間内のいいねを集計
+  const recent = await prisma.postLike.groupBy({
+    by: ['postId'],
+    where: {
+      createdAt: { gte: since },
+      post: { communityId, approvalStatus: 'approved', parentPostId: null },
+    },
+    _count: { postId: true },
+  });
+  const counts = new Map(recent.map((r) => [r.postId, r._count.postId]));
+  const ids = recent.map((r) => r.postId);
+  if (ids.length === 0) return c.json({ days, items: [] });
+
+  const posts = await prisma.post.findMany({
+    where: { id: { in: ids } },
+    include: {
+      author: { select: { id: true, name: true, avatarUrl: true } },
+      _count: { select: { likes: true, comments: true } },
+    },
+  });
+
+  let likedSet = new Set<string>();
+  if (me) {
+    const liked = await prisma.postLike.findMany({
+      where: { userId: me.id, postId: { in: ids } },
+      select: { postId: true },
+    });
+    likedSet = new Set(liked.map((l) => l.postId));
+  }
+
+  const items = posts.map((p) => serializePost(p, me?.id, likedSet));
+  items.sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0));
+  return c.json({ days, items });
+});
+
 function serializePost(
   p: any,
   meId?: string | null,
