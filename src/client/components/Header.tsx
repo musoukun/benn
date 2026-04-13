@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Avatar } from './Avatar';
 import { useMe, setMe } from '../useMe';
 import { useTheme } from '../useTheme';
@@ -9,6 +9,8 @@ import { NotificationBell } from './NotificationBell';
 export function Header() {
   const me = useMe();
   const nav = useNavigate();
+  const { pathname } = useLocation();
+  const isAdminPage = pathname.startsWith('/admin');
   const [theme, , toggleTheme] = useTheme();
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,7 +155,7 @@ export function Header() {
               )}
             </div>
           </>
-        ) : (
+        ) : !isAdminPage ? (
           <>
             <Link to="/login" className="nav-link">
               ログイン
@@ -162,7 +164,7 @@ export function Header() {
               新規登録
             </Link>
           </>
-        )}
+        ) : null}
       </div>
     </header>
   );
