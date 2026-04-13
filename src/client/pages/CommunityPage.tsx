@@ -29,6 +29,7 @@ export function CommunityPage() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [activeTimelineId, setActiveTimelineId] = useState<string | null>(null);
   const [tlPosts, setTlPosts] = useState<Post[]>([]);
+  const [tlForbidden, setTlForbidden] = useState(false);
   const [pending, setPending] = useState<any[]>([]);
   const [invites, setInvites] = useState<any[]>([]);
   // タイムライン管理は TimelineManager コンポーネントに切り出し
@@ -58,7 +59,11 @@ export function CommunityPage() {
 
   useEffect(() => {
     if (!activeTimelineId || !c) return;
-    api.listTimelinePosts(activeTimelineId).then(setTlPosts).catch(() => setTlPosts([]));
+    setTlForbidden(false);
+    api.listTimelinePosts(activeTimelineId).then(setTlPosts).catch((e) => {
+      setTlPosts([]);
+      if (e instanceof ApiError && e.status === 403) setTlForbidden(true);
+    });
   }, [activeTimelineId, c]);
 
   useEffect(() => {
@@ -324,8 +329,19 @@ export function CommunityPage() {
             )}
           </div>
 
-          {/* SNS 投稿 composer (メンバーのみ) */}
-          {isMember && activeTimelineId && (
+          {/* アクセス権なし */}
+          {tlForbidden && (
+            <div className="empty" style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔒</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>このタイムラインは表示できません</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)' }}>
+                プライベートタイムラインです。メンバーに追加されていない場合は閲覧できません。
+              </div>
+            </div>
+          )}
+
+          {/* SNS 投稿 composer (メンバーのみ、アクセス権あり) */}
+          {!tlForbidden && isMember && activeTimelineId && (
             <PostComposer
               communityId={c.id}
               timelineId={activeTimelineId}
@@ -334,7 +350,7 @@ export function CommunityPage() {
           )}
 
           {/* SNS 投稿一覧 */}
-          {tlPosts.length > 0 && (
+          {!tlForbidden && tlPosts.length > 0 && (
             <div className="post-feed">
               {tlPosts.map((p) => (
                 <PostCard
@@ -350,7 +366,7 @@ export function CommunityPage() {
             </div>
           )}
 
-          {tlPosts.length === 0 && (
+          {!tlForbidden && tlPosts.length === 0 && (
             <div className="empty">
               {isMember
                 ? 'まだ投稿がありません。上のフォームから最初の投稿をしてみよう。'
