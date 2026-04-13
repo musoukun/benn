@@ -10,6 +10,8 @@ export const EVENTS = {
   TYPING: 'chat:typing',
   TOGGLE_REACTION: 'chat:reaction',
   MARK_READ: 'chat:read',
+  PIN_MESSAGE: 'chat:message:pin',
+  FORWARD_MESSAGE: 'chat:message:forward',
 
   // Server → Client (名前は同じだがペイロードで区別)
   NEW_MESSAGE: 'chat:message',
@@ -20,6 +22,7 @@ export const EVENTS = {
   ROOM_UPDATED: 'chat:room:update',
   MEMBER_JOINED: 'chat:member:join',
   MEMBER_LEFT: 'chat:member:leave',
+  MESSAGE_PINNED: 'chat:message:pin',
 } as const;
 
 // Socket.IO の room prefix (Socket.IO 内部の "room" と DB の ChatRoom を区別)

@@ -12,9 +12,12 @@ const EVENTS = {
   TYPING: 'chat:typing',
   TOGGLE_REACTION: 'chat:reaction',
   MARK_READ: 'chat:read',
+  PIN_MESSAGE: 'chat:message:pin',
+  FORWARD_MESSAGE: 'chat:message:forward',
   REACTION_UPDATE: 'chat:reaction',
   MEMBER_JOINED: 'chat:member:join',
   MEMBER_LEFT: 'chat:member:leave',
+  MESSAGE_PINNED: 'chat:message:pin',
 } as const;
 
 type TypingUser = { userId: string; userName: string };
@@ -98,11 +101,19 @@ export function useChatRoom(roomId: string) {
       );
     };
 
+    const onPinUpdate = (data: { roomId: string; messageId: string; pinnedAt: string | null; pinnedById: string | null }) => {
+      if (data.roomId !== roomId) return;
+      setMessages((prev) => prev.map((m) =>
+        m.id === data.messageId ? { ...m, pinnedAt: data.pinnedAt, pinnedById: data.pinnedById } : m
+      ));
+    };
+
     socket.on(EVENTS.SEND_MESSAGE, onMessage);
     socket.on(EVENTS.EDIT_MESSAGE, onMessageEdited);
     socket.on(EVENTS.DELETE_MESSAGE, onMessageDeleted);
     socket.on(EVENTS.TYPING, onTyping);
     socket.on(EVENTS.REACTION_UPDATE, onReactionUpdate);
+    socket.on(EVENTS.MESSAGE_PINNED, onPinUpdate);
 
     // 既読マーク
     socket.emit(EVENTS.MARK_READ, { roomId });
@@ -114,17 +125,18 @@ export function useChatRoom(roomId: string) {
       socket.off(EVENTS.DELETE_MESSAGE, onMessageDeleted);
       socket.off(EVENTS.TYPING, onTyping);
       socket.off(EVENTS.REACTION_UPDATE, onReactionUpdate);
+      socket.off(EVENTS.MESSAGE_PINNED, onPinUpdate);
       // cleanup typing timeouts
       typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
     };
   }, [roomId]);
 
-  // メッセージ送信
+  // メッセージ送信 (返信対応)
   const sendMessage = useCallback(
-    (body: string) => {
+    (body: string, parentMessageId?: string) => {
       const socket = getSocket();
-      socket.emit(EVENTS.SEND_MESSAGE, { roomId, body });
+      socket.emit(EVENTS.SEND_MESSAGE, { roomId, body, parentMessageId });
     },
     [roomId]
   );
@@ -165,6 +177,24 @@ export function useChatRoom(roomId: string) {
     [roomId]
   );
 
+  // ピン留めトグル
+  const pinMessage = useCallback(
+    (messageId: string) => {
+      const socket = getSocket();
+      socket.emit(EVENTS.PIN_MESSAGE, { roomId, messageId });
+    },
+    [roomId]
+  );
+
+  // メッセージ転送
+  const forwardMessage = useCallback(
+    (messageId: string, targetRoomId: string, comment?: string) => {
+      const socket = getSocket();
+      socket.emit(EVENTS.FORWARD_MESSAGE, { sourceRoomId: roomId, messageId, targetRoomId, comment });
+    },
+    [roomId]
+  );
+
   // 過去メッセージ読み込み
   const loadMore = useCallback(async () => {
     if (!hasMore || messages.length === 0) return;
@@ -184,6 +214,8 @@ export function useChatRoom(roomId: string) {
     deleteMessage,
     sendTyping,
     toggleReaction,
+    pinMessage,
+    forwardMessage,
     loadMore,
   };
 }

@@ -475,19 +475,26 @@ model ChatRoomMember {
 }
 
 model ChatMessage {
-  id        String    @id @default(cuid())
-  roomId    String
-  authorId  String
-  body      String
-  type      String    @default("user")
-  editedAt  DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  room      ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  author    User            @relation(fields: [authorId], references: [id])
-  reactions MessageReaction[]
+  id              String    @id @default(cuid())
+  roomId          String
+  authorId        String
+  body            String
+  type            String    @default("user")
+  editedAt        DateTime?
+  parentMessageId String?
+  pinnedAt        DateTime?
+  pinnedById      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  room            ChatRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author          User            @relation(fields: [authorId], references: [id])
+  reactions       MessageReaction[]
+  parentMessage   ChatMessage?    @relation("MessageThread", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  replies         ChatMessage[]   @relation("MessageThread")
   @@index([roomId, createdAt])
   @@index([authorId])
+  @@index([parentMessageId])
+  @@index([roomId, pinnedAt])
 }
 
 model MessageReaction {

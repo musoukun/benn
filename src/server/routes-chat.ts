@@ -412,6 +412,8 @@ chatRoutes.get('/rooms/:id/messages', requireAuth, async (c) => {
     include: {
       author: { select: { id: true, name: true, avatarUrl: true } },
       reactions: { include: { user: { select: { id: true, name: true } } } },
+      parentMessage: { select: { id: true, body: true, authorId: true, author: { select: { id: true, name: true, avatarUrl: true } } } },
+      _count: { select: { replies: true } },
     },
   });
 
@@ -427,12 +429,108 @@ chatRoutes.get('/rooms/:id/messages', requireAuth, async (c) => {
       authorId: msg.authorId,
       author: msg.author,
       editedAt: msg.editedAt,
+      pinnedAt: msg.pinnedAt,
+      pinnedById: msg.pinnedById,
+      parentMessage: msg.parentMessage ? {
+        id: msg.parentMessage.id,
+        body: msg.parentMessage.body,
+        authorId: msg.parentMessage.authorId,
+        author: msg.parentMessage.author,
+      } : null,
       isMine: msg.authorId === me.id,
       reactions: groupReactions(msg.reactions, me.id),
+      replyCount: (msg as any)._count?.replies ?? 0,
       createdAt: msg.createdAt,
       updatedAt: msg.updatedAt,
     }))
   );
+});
+
+// ---------- スレッド (返信一覧) ----------
+
+chatRoutes.get('/rooms/:id/messages/:msgId/thread', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const roomId = c.req.param('id');
+  const msgId = c.req.param('msgId');
+
+  const member = await prisma.chatRoomMember.findUnique({
+    where: { userId_roomId: { userId: me.id, roomId } },
+  });
+  if (!member) throw new Error('forbidden');
+
+  // 親メッセージ
+  const parent = await prisma.chatMessage.findUnique({
+    where: { id: msgId },
+    include: {
+      author: { select: { id: true, name: true, avatarUrl: true } },
+      reactions: { include: { user: { select: { id: true, name: true } } } },
+      _count: { select: { replies: true } },
+    },
+  });
+  if (!parent || parent.roomId !== roomId) return c.json(null, 404);
+
+  // 返信一覧
+  const replies = await prisma.chatMessage.findMany({
+    where: { parentMessageId: msgId },
+    orderBy: { createdAt: 'asc' },
+    take: 200,
+    include: {
+      author: { select: { id: true, name: true, avatarUrl: true } },
+      reactions: { include: { user: { select: { id: true, name: true } } } },
+    },
+  });
+
+  const serializeMsg = (msg: any) => ({
+    id: msg.id,
+    roomId: msg.roomId,
+    body: msg.body,
+    type: msg.type,
+    authorId: msg.authorId,
+    author: msg.author,
+    editedAt: msg.editedAt,
+    pinnedAt: msg.pinnedAt ?? null,
+    pinnedById: msg.pinnedById ?? null,
+    parentMessage: null,
+    isMine: msg.authorId === me.id,
+    reactions: groupReactions(msg.reactions, me.id),
+    replyCount: (msg as any)._count?.replies ?? 0,
+    createdAt: msg.createdAt,
+    updatedAt: msg.updatedAt,
+  });
+
+  return c.json({
+    parent: serializeMsg(parent),
+    replies: replies.map(serializeMsg),
+  });
+});
+
+// ---------- ピン留めメッセージ一覧 ----------
+
+chatRoutes.get('/rooms/:id/pinned', requireAuth, async (c) => {
+  const me = c.get('user')!;
+  const roomId = c.req.param('id');
+
+  const member = await prisma.chatRoomMember.findUnique({
+    where: { userId_roomId: { userId: me.id, roomId } },
+  });
+  if (!member) throw new Error('forbidden');
+
+  const pinned = await prisma.chatMessage.findMany({
+    where: { roomId, pinnedAt: { not: null } },
+    orderBy: { pinnedAt: 'desc' },
+    include: {
+      author: { select: { id: true, name: true, avatarUrl: true } },
+    },
+  });
+
+  return c.json(pinned.map((msg) => ({
+    id: msg.id,
+    body: msg.body,
+    authorId: msg.authorId,
+    author: msg.author,
+    pinnedAt: msg.pinnedAt,
+    createdAt: msg.createdAt,
+  })));
 });
 
 // ---------- メッセージ検索 ----------

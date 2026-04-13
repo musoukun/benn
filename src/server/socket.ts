@@ -63,10 +63,10 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
       socket.leave(socketRoomId(roomId));
     });
 
-    // --- chat:message — メッセージ送信 ---
-    socket.on(EVENTS.SEND_MESSAGE, async (data: { roomId: string; body: string }, ack?: (res: any) => void) => {
+    // --- chat:message — メッセージ送信 (返信対応: parentMessageId) ---
+    socket.on(EVENTS.SEND_MESSAGE, async (data: { roomId: string; body: string; parentMessageId?: string }, ack?: (res: any) => void) => {
       try {
-        const { roomId, body } = data;
+        const { roomId, body, parentMessageId } = data;
         if (!body?.trim()) return;
 
         // メンバーシップ確認
@@ -77,10 +77,20 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
 
         const trimmed = body.trim().slice(0, 50000);
 
+        // parentMessageId が指定されていたら同一ルームのメッセージか検証
+        let validParentId: string | undefined;
+        if (parentMessageId) {
+          const parent = await prisma.chatMessage.findUnique({ where: { id: parentMessageId }, select: { roomId: true } });
+          if (parent && parent.roomId === roomId) validParentId = parentMessageId;
+        }
+
         // DB 保存
         const msg = await prisma.chatMessage.create({
-          data: { roomId, authorId: user.id, body: trimmed },
-          include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+          data: { roomId, authorId: user.id, body: trimmed, parentMessageId: validParentId },
+          include: {
+            author: { select: { id: true, name: true, avatarUrl: true } },
+            parentMessage: { select: { id: true, body: true, authorId: true, author: { select: { id: true, name: true, avatarUrl: true } } } },
+          },
         });
 
         // ルームの lastMessage 非正規化 + messageCount 更新
@@ -103,7 +113,7 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
 
         const payload = serializeMessage(msg, user.id);
 
-        // ルーム全員にブロードキャスト (RC: room-messages stream)
+        // ルーム全員にブロードキャスト
         io!.to(socketRoomId(roomId)).emit(EVENTS.NEW_MESSAGE, payload);
 
         if (ack) ack({ ok: true, message: payload });
@@ -206,6 +216,112 @@ export function initSocketIO(httpServer: HttpServer): SocketIOServer {
       }
     });
 
+    // --- chat:message:pin — ピン留めトグル ---
+    socket.on(EVENTS.PIN_MESSAGE, async (data: { roomId: string; messageId: string }, ack?: (res: any) => void) => {
+      try {
+        const { roomId, messageId } = data;
+        const member = await prisma.chatRoomMember.findUnique({
+          where: { userId_roomId: { userId: user.id, roomId } },
+        });
+        if (!member) return;
+
+        const msg = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+        if (!msg || msg.roomId !== roomId) return;
+
+        const isPinned = !!msg.pinnedAt;
+        const updated = await prisma.chatMessage.update({
+          where: { id: messageId },
+          data: {
+            pinnedAt: isPinned ? null : new Date(),
+            pinnedById: isPinned ? null : user.id,
+          },
+          include: {
+            author: { select: { id: true, name: true, avatarUrl: true } },
+            parentMessage: { select: { id: true, body: true, authorId: true, author: { select: { id: true, name: true, avatarUrl: true } } } },
+          },
+        });
+
+        io!.to(socketRoomId(roomId)).emit(EVENTS.MESSAGE_PINNED, {
+          roomId,
+          messageId,
+          pinnedAt: updated.pinnedAt,
+          pinnedById: updated.pinnedById,
+        });
+
+        // システムメッセージ
+        const action = isPinned ? 'ピン留めを解除しました' : 'メッセージをピン留めしました';
+        const sysMsg = await prisma.chatMessage.create({
+          data: { roomId, authorId: user.id, body: `${user.name} が${action}`, type: 'system' },
+          include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        });
+        io!.to(socketRoomId(roomId)).emit(EVENTS.NEW_MESSAGE, serializeMessage(sysMsg, user.id));
+
+        if (ack) ack({ ok: true, pinned: !isPinned });
+      } catch (e) {
+        console.error('[socket] chat:message:pin error', e);
+        if (ack) ack({ ok: false });
+      }
+    });
+
+    // --- chat:message:forward — メッセージ転送 ---
+    socket.on(EVENTS.FORWARD_MESSAGE, async (data: { sourceRoomId: string; messageId: string; targetRoomId: string; comment?: string }, ack?: (res: any) => void) => {
+      try {
+        const { sourceRoomId, messageId, targetRoomId, comment } = data;
+
+        // 転送元のメンバーシップ確認
+        const srcMember = await prisma.chatRoomMember.findUnique({
+          where: { userId_roomId: { userId: user.id, roomId: sourceRoomId } },
+        });
+        if (!srcMember) return;
+
+        // 転送先のメンバーシップ確認
+        const dstMember = await prisma.chatRoomMember.findUnique({
+          where: { userId_roomId: { userId: user.id, roomId: targetRoomId } },
+        });
+        if (!dstMember) return;
+
+        // 元メッセージ取得
+        const original = await prisma.chatMessage.findUnique({
+          where: { id: messageId },
+          include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        });
+        if (!original || original.roomId !== sourceRoomId) return;
+
+        // 転送先に引用メッセージとして送信
+        const quotedBody = `> **${original.author.name}**: ${original.body.split('\n').join('\n> ')}\n\n${comment || ''}`.trim();
+
+        const msg = await prisma.chatMessage.create({
+          data: { roomId: targetRoomId, authorId: user.id, body: quotedBody },
+          include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+        });
+
+        // ルームの lastMessage 更新
+        await prisma.chatRoom.update({
+          where: { id: targetRoomId },
+          data: {
+            lastMessageId: msg.id,
+            lastMessageAt: msg.createdAt,
+            lastMessageBody: quotedBody.slice(0, 100),
+            lastMessageAuthor: user.name,
+            messageCount: { increment: 1 },
+          },
+        });
+
+        await prisma.chatRoomMember.updateMany({
+          where: { roomId: targetRoomId, userId: { not: user.id } },
+          data: { unreadCount: { increment: 1 } },
+        });
+
+        const payload = serializeMessage(msg, user.id);
+        io!.to(socketRoomId(targetRoomId)).emit(EVENTS.NEW_MESSAGE, payload);
+
+        if (ack) ack({ ok: true });
+      } catch (e) {
+        console.error('[socket] chat:message:forward error', e);
+        if (ack) ack({ ok: false });
+      }
+    });
+
     // --- chat:read — 既読更新 (RC: ISubscription.unread + ls) ---
     socket.on(EVENTS.MARK_READ, async (data: { roomId: string }) => {
       try {
@@ -237,10 +353,19 @@ function serializeMessage(msg: any, meId: string) {
     authorId: msg.authorId,
     author: msg.author,
     editedAt: msg.editedAt,
+    pinnedAt: msg.pinnedAt ?? null,
+    pinnedById: msg.pinnedById ?? null,
+    parentMessage: msg.parentMessage ? {
+      id: msg.parentMessage.id,
+      body: msg.parentMessage.body,
+      authorId: msg.parentMessage.authorId,
+      author: msg.parentMessage.author,
+    } : null,
     isMine: msg.authorId === meId,
     createdAt: msg.createdAt,
     updatedAt: msg.updatedAt,
-    reactions: [],  // 新着メッセージにはリアクションなし
+    reactions: [],
+    replyCount: 0,
   };
 }
 
