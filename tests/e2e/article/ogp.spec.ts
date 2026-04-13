@@ -7,7 +7,7 @@ import * as path from 'node:path';
 // - 内部記事 / 投稿の OGP 画像生成 (PNG)
 // - PostCard のリッチ URL カードに OGP 取得結果が出る
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-ogp');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'ogp');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 let _i = 0;
 function shotPath(name: string) {

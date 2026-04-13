@@ -82,5 +82,5 @@ test('コードフェンス内のAA図が忠実に保存・描画される', asy
   expect(lineHeight / fontSize).toBeLessThanOrEqual(1.6);
 
   // スクリーンショット (人間が後で目視確認できるよう保存)
-  await pre.screenshot({ path: 'test-results/aa-rendering.png' });
+  await pre.screenshot({ path: 'screenshots/ascii-art/aa-rendering.png' });
 });

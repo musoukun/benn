@@ -6,7 +6,7 @@ import * as path from 'node:path';
 // - 検索3タブ (記事 / コミュニティ / SNS 投稿)
 // - アバターを絵文字で設定 (最も簡単なパス)
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-phase5');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'search-avatar');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 let _i = 0;
 function shotPath(name: string) {

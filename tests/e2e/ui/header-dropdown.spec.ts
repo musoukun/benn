@@ -2,7 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-header');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'header');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 let _i = 0;
 function p(n: string) { _i++; return path.join(SHOTS_DIR, `${String(_i).padStart(2, '0')}-${n}.png`); }

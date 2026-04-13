@@ -10,7 +10,7 @@ import * as path from 'node:path';
 // - URL を含む投稿で URL カードが描画されること
 // - いいねトグル
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-sns');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'sns-post');
 
 let _i = 0;
 function shotPath(name: string) {

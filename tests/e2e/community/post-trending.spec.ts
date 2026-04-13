@@ -7,7 +7,7 @@ import * as path from 'node:path';
 // - トレンド API がいいね数順で返すことを検証
 // - UI のトレンドタブに表示されることを検証
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-post-trending');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'post-trending');
 
 let _i = 0;
 function shotPath(name: string) {

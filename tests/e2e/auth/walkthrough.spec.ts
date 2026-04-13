@@ -9,7 +9,7 @@ import { PrismaClient } from '@prisma/client';
 // AI 機能は Gemini のみ。既存DB上の暗号化済みキーを復号してこのテストの中で
 // 新規ユーザーに登録し直す（API キーは平文で受け取る必要があるため）。
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'walkthrough');
 
 function shotPath(name: string) {
   if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });

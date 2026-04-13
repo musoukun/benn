@@ -11,6 +11,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
+  // テスト失敗時のスクショ・トレースは screenshots/ 配下に保存
+  outputDir: './screenshots/test-results',
   use: {
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:5173',
     headless: true,

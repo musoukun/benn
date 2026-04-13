@@ -2,7 +2,7 @@ import { test, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-layout');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'layout');
 if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 async function reg(page: Page, prefix: string) {

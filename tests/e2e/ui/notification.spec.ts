@@ -9,7 +9,7 @@ import * as path from 'node:path';
 // - 「すべて」と「コメント」タブの絞り込み
 // - ドロップダウンを開いたらバッジが消える
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-notif');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'notification');
 let _i = 0;
 function shotPath(name: string) {
   if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });

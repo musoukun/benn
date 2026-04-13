@@ -7,7 +7,7 @@ import * as path from 'node:path';
 // 既存の registerAndLogin と違い、ブラウザコンテキストを context ベースで作って
 // それぞれに別のセッション cookie を持たせる。
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-community');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'community');
 
 let _i = 0;
 function shotPath(name: string) {

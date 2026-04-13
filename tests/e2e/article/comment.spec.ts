@@ -8,7 +8,7 @@ import * as path from 'node:path';
 // - 返信への返信は子と同階層 (フラット) で並ぶ
 // - 編集 / 削除
 
-const SHOTS_DIR = path.join(process.cwd(), 'screenshots-comment');
+const SHOTS_DIR = path.join(process.cwd(), 'screenshots', 'comment');
 let _i = 0;
 function shotPath(name: string) {
   if (!fs.existsSync(SHOTS_DIR)) fs.mkdirSync(SHOTS_DIR, { recursive: true });
