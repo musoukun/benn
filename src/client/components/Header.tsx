@@ -57,9 +57,11 @@ export function Header() {
             🔖 Bookmarks
           </NavLink>
         )}
-        <NavLink to="/communities" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-          🌐 Communities
-        </NavLink>
+        {me && (
+          <NavLink to="/communities" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            🌐 Communities
+          </NavLink>
+        )}
         {me && (
           <NavLink to="/chat" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
             💬 Chat
