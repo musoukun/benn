@@ -1,5 +1,6 @@
-# 社内HTTPS: Caddyが自己署名証明書を自動生成
-# tls internal = 自己署名証明書を自動生成 (Let's Encrypt不要)
+{
+    auto_https off
+}
 
 :7635 {
     tls internal
