@@ -28,7 +28,9 @@ function CrepeView({
     });
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
-        onChangeRef.current(markdown);
+        // Milkdown が <br> を出力する場合があるので Markdown 改行に正規化
+        const normalized = markdown.replace(/<br\s*\/?>/gi, '  \n');
+        onChangeRef.current(normalized);
       });
     });
     return crepe;
@@ -98,7 +100,7 @@ export function PostComposer({
           disabled={posting || !body.trim()}
           onClick={submit}
         >
-          {posting ? '投稿中…' : '投稿する'}
+          {posting ? '投稿する' : '投稿する'}
         </button>
       </div>
     </div>
