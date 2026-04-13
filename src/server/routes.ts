@@ -412,11 +412,17 @@ async function saveArticle(
     approvalStatus?: string; // "draft" | "pending" | "approved"
   }
 ) {
-  const title = String(input.title || '').slice(0, 200);
+  const title = String(input.title || '').trim().slice(0, 200);
   const emoji = String(input.emoji || '📝').slice(0, 8);
   const body = String(input.body || '').slice(0, 49000);
   let published = !!input.published;
   const type = input.type === 'diary' ? 'diary' : input.type === 'howto' ? 'howto' : '';
+
+  // 公開時はタイトルと本文を必須にする
+  if (published) {
+    if (!title) throw new Error('タイトルを入力してください');
+    if (!body.trim()) throw new Error('本文を入力してください');
+  }
   const topicNames = (input.topicNames || []).slice(0, 5);
 
   // visibility: "public" | "friends_only"

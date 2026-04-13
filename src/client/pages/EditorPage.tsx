@@ -187,6 +187,10 @@ export function EditorPage() {
           alert('タイトルを入力してください');
           return;
         }
+        if (!body.trim()) {
+          alert('本文を入力してください');
+          return;
+        }
         if (topics.length === 0) {
           alert('トピックを最低1つ入力してください');
           return;

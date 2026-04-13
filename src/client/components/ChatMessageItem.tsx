@@ -7,6 +7,7 @@ import { MentionText } from './MentionText';
 import type { ChatMessage } from '../types';
 import { getRecentEmoji, addRecentEmoji } from '../hooks/useRecentEmoji';
 import { hasMentionForMe } from '../utils/mention';
+import { SmilePlus, Reply, Copy, Pin, Forward, Pencil, Trash2, MessageSquare } from 'lucide-react';
 
 type Props = {
   message: ChatMessage;
@@ -62,11 +63,6 @@ export function ChatMessageItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* ピン留めバッジ */}
-      {message.pinnedAt && !grouped && (
-        <div className="dc-msg-pin-badge">📌 ピン留め</div>
-      )}
-
       {/* 返信元の引用表示 */}
       {message.parentMessage && !grouped && (
         <div className="dc-msg-reply-quote" onClick={() => onOpenThread?.(message.parentMessage!.id)}>
@@ -92,6 +88,10 @@ export function ChatMessageItem({
 
       {/* 本文列 */}
       <div className="dc-msg-body">
+        {/* ピン留めバッジ */}
+        {message.pinnedAt && !grouped && (
+          <div className="dc-msg-pin-badge"><Pin size={12} /> ピン留め</div>
+        )}
         {!grouped && (
           <div className="dc-msg-header">
             <Link to={`/users/${message.authorId}`} className="dc-msg-author">
@@ -128,7 +128,7 @@ export function ChatMessageItem({
         {/* スレッドリンク */}
         {message.replyCount > 0 && (
           <button className="dc-msg-thread-link" onClick={() => onOpenThread?.(message.id)}>
-            💬 {message.replyCount}件の返信
+            <MessageSquare size={14} /> {message.replyCount}件の返信
           </button>
         )}
 
@@ -152,13 +152,13 @@ export function ChatMessageItem({
             <button key={e} title={e} onClick={() => { addRecentEmoji(e); onToggleReaction(message.id, e); }}>{e}</button>
           ))}
           <span className="dc-msg-actions-sep" />
-          <button title="リアクションを追加" onClick={() => setShowPicker(true)}>😊</button>
-          {onReply && <button title="返信" onClick={() => onReply(message)}>↩️</button>}
-          <button title="テキストをコピー" onClick={handleCopyText}>📋</button>
-          {onPin && <button title={message.pinnedAt ? 'ピン留め解除' : 'ピン留め'} onClick={() => onPin(message.id)}>{message.pinnedAt ? '📌' : '📌'}</button>}
-          {onForward && <button title="転送" onClick={() => onForward(message)}>↗️</button>}
-          {onEdit && <button title="編集" onClick={() => { setEditing(true); setEditBody(message.body); }}>✏️</button>}
-          {onDelete && <button title="削除" onClick={() => onDelete(message.id)}>🗑️</button>}
+          <button title="リアクションを追加" onClick={() => setShowPicker(true)}><SmilePlus size={16} /></button>
+          {onReply && <button title="返信" onClick={() => onReply(message)}><Reply size={16} /></button>}
+          <button title="テキストをコピー" onClick={handleCopyText}><Copy size={16} /></button>
+          {onPin && <button title={message.pinnedAt ? 'ピン留め解除' : 'ピン留め'} onClick={() => onPin(message.id)}><Pin size={16} /></button>}
+          {onForward && <button title="転送" onClick={() => onForward(message)}><Forward size={16} /></button>}
+          {onEdit && <button title="編集" onClick={() => { setEditing(true); setEditBody(message.body); }}><Pencil size={16} /></button>}
+          {onDelete && <button title="削除" onClick={() => onDelete(message.id)}><Trash2 size={16} /></button>}
         </div>
       )}
     </div>
