@@ -1,21 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar } from './Avatar';
 import { ReactionBar } from './ReactionBar';
 import { ReactionPicker } from './ReactionPicker';
 import type { ChatMessage } from '../types';
 import { getRecentEmoji, addRecentEmoji } from '../hooks/useRecentEmoji';
+import MarkdownIt from 'markdown-it';
+
+// markdown-it インスタンス (メッセージ用: 軽量設定)
+const md = MarkdownIt({ linkify: true, breaks: true });
 
 type Props = {
   message: ChatMessage;
-  /** 直前のメッセージと同一著者 & 5分以内ならtrue → アバター・名前を省略 */
   grouped: boolean;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onEdit?: (messageId: string, body: string) => void;
   onDelete?: (messageId: string) => void;
+  onReply?: (message: ChatMessage) => void;
+  onPin?: (messageId: string) => void;
+  onForward?: (message: ChatMessage) => void;
+  onOpenThread?: (messageId: string) => void;
 };
 
-export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, onDelete }: Props) {
+export function ChatMessageItem({
+  message, grouped, onToggleReaction,
+  onEdit, onDelete, onReply, onPin, onForward, onOpenThread,
+}: Props) {
   const [showPicker, setShowPicker] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(message.body);
@@ -39,13 +49,35 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
     setEditing(false);
   };
 
+  const handleCopyText = () => {
+    navigator.clipboard.writeText(message.body);
+  };
+
+  // Markdown レンダリング (メモ化)
+  const renderedBody = useMemo(() => md.render(message.body), [message.body]);
+
   return (
     <div
-      className={`dc-msg${grouped ? ' dc-msg-grouped' : ''}`}
+      className={`dc-msg${grouped ? ' dc-msg-grouped' : ''}${message.pinnedAt ? ' dc-msg-pinned' : ''}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* アバター列 (グルーピング時は時刻をホバーで表示) */}
+      {/* ピン留めバッジ */}
+      {message.pinnedAt && !grouped && (
+        <div className="dc-msg-pin-badge">📌 ピン留め</div>
+      )}
+
+      {/* 返信元の引用表示 */}
+      {message.parentMessage && !grouped && (
+        <div className="dc-msg-reply-quote" onClick={() => onOpenThread?.(message.parentMessage!.id)}>
+          <div className="dc-msg-reply-bar" />
+          <Avatar user={message.parentMessage.author} size={16} />
+          <span className="dc-msg-reply-author">{message.parentMessage.author.name}</span>
+          <span className="dc-msg-reply-text">{message.parentMessage.body.slice(0, 100)}</span>
+        </div>
+      )}
+
+      {/* アバター列 */}
       <div className="dc-msg-gutter">
         {grouped ? (
           <span className="dc-msg-time-inline" title={fullDate}>
@@ -60,7 +92,6 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
 
       {/* 本文列 */}
       <div className="dc-msg-body">
-        {/* 名前 + 時刻ヘッダー (非グルーピング時のみ) */}
         {!grouped && (
           <div className="dc-msg-header">
             <Link to={`/users/${message.authorId}`} className="dc-msg-author">
@@ -88,17 +119,21 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
             </div>
           </div>
         ) : (
-          <div className="dc-msg-text">
-            {message.body}
-            {message.editedAt && <span className="dc-msg-edited">(編集済)</span>}
-          </div>
+          <div className="dc-msg-text dc-msg-markdown" dangerouslySetInnerHTML={{ __html: renderedBody }} />
+        )}
+        {!editing && message.editedAt && <span className="dc-msg-edited">(編集済)</span>}
+
+        {/* スレッドリンク */}
+        {message.replyCount > 0 && (
+          <button className="dc-msg-thread-link" onClick={() => onOpenThread?.(message.id)}>
+            💬 {message.replyCount}件の返信
+          </button>
         )}
 
         {/* リアクション */}
         <ReactionBar
           reactions={message.reactions}
           onToggle={(emoji) => onToggleReaction(message.id, emoji)}
-          onPickerOpen={() => setShowPicker(true)}
         />
         {showPicker && (
           <ReactionPicker
@@ -108,7 +143,7 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
         )}
       </div>
 
-      {/* ホバー時のアクションバー (Discord風: 最近のリアクション + ピッカー + 編集 + 削除) */}
+      {/* ホバー時のアクションバー */}
       {hovered && !editing && (
         <div className="dc-msg-actions">
           {getRecentEmoji().map((e) => (
@@ -116,6 +151,10 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
           ))}
           <span className="dc-msg-actions-sep" />
           <button title="リアクションを追加" onClick={() => setShowPicker(true)}>😊</button>
+          {onReply && <button title="返信" onClick={() => onReply(message)}>↩️</button>}
+          <button title="テキストをコピー" onClick={handleCopyText}>📋</button>
+          {onPin && <button title={message.pinnedAt ? 'ピン留め解除' : 'ピン留め'} onClick={() => onPin(message.id)}>{message.pinnedAt ? '📌' : '📌'}</button>}
+          {onForward && <button title="転送" onClick={() => onForward(message)}>↗️</button>}
           {onEdit && <button title="編集" onClick={() => { setEditing(true); setEditBody(message.body); }}>✏️</button>}
           {onDelete && <button title="削除" onClick={() => onDelete(message.id)}>🗑️</button>}
         </div>

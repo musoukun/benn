@@ -456,6 +456,10 @@ export const api = {
     req<ChatMessage[]>(`/chat/rooms/${roomId}/messages${before ? `?before=${before}` : ''}`),
   searchChatMessages: (roomId: string, q: string) =>
     req<any[]>(`/chat/rooms/${roomId}/messages/search?q=${encodeURIComponent(q)}`),
+  getChatThread: (roomId: string, messageId: string) =>
+    req<{ parent: ChatMessage; replies: ChatMessage[] }>(`/chat/rooms/${roomId}/messages/${messageId}/thread`),
+  getChatPinned: (roomId: string) =>
+    req<any[]>(`/chat/rooms/${roomId}/pinned`),
   togglePostReaction: (postId: string, emoji: string) =>
     req<{ toggled: boolean; reactions: ReactionGroup[] }>(`/reactions/posts/${postId}`, { method: 'POST', body: JSON.stringify({ emoji }) }),
   getPostReactions: (postId: string) => req<ReactionGroup[]>(`/reactions/posts/${postId}`),

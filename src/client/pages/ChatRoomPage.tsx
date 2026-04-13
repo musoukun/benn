@@ -6,7 +6,7 @@ import { useChatRoom } from '../hooks/useChatRoom';
 import { ChatMessageItem, DateSeparator } from '../components/ChatMessageItem';
 import { Avatar } from '../components/Avatar';
 import { useMe } from '../useMe';
-import type { ChatRoomFull } from '../types';
+import type { ChatRoomFull, ChatMessage, ChatRoomSummary } from '../types';
 
 export function ChatRoomPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +20,21 @@ export function ChatRoomPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 返信先
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  // スレッドペイン
+  const [threadMessageId, setThreadMessageId] = useState<string | null>(null);
+  const [threadData, setThreadData] = useState<{ parent: ChatMessage; replies: ChatMessage[] } | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadInput, setThreadInput] = useState('');
+
+  // 転送モーダル
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
+  const [forwardRooms, setForwardRooms] = useState<ChatRoomSummary[]>([]);
+  const [forwardSearch, setForwardSearch] = useState('');
+  const [forwardComment, setForwardComment] = useState('');
+
   useEffect(() => { connectSocket(); }, []);
 
   // チャット画面ではbodyスクロールを無効化
@@ -30,7 +45,8 @@ export function ChatRoomPage() {
 
   const {
     messages, typingUsers, loading, hasMore,
-    sendMessage, editMessage, deleteMessage, sendTyping, toggleReaction, loadMore,
+    sendMessage, editMessage, deleteMessage, sendTyping, toggleReaction,
+    pinMessage, forwardMessage, loadMore,
   } = useChatRoom(id!);
 
   useEffect(() => {
@@ -49,11 +65,31 @@ export function ChatRoomPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // スレッド読み込み
+  useEffect(() => {
+    if (!threadMessageId || !id) {
+      setThreadData(null);
+      return;
+    }
+    setThreadLoading(true);
+    api.getChatThread(id, threadMessageId).then((data) => {
+      setThreadData(data);
+      setThreadLoading(false);
+    }).catch(() => setThreadLoading(false));
+  }, [threadMessageId, id]);
+
+  // 転送モーダルを開いたときにルーム一覧を取得
+  useEffect(() => {
+    if (!forwardingMessage) return;
+    api.listChatRooms().then(setForwardRooms);
+  }, [forwardingMessage]);
+
   const handleSend = () => {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
-    sendMessage(trimmed);
+    sendMessage(trimmed, replyingTo?.id);
     setInputValue('');
+    setReplyingTo(null);
     sendTyping(false);
   };
 
@@ -61,6 +97,10 @@ export function ChatRoomPage() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
+    }
+    if (e.key === 'Escape' && replyingTo) {
+      setReplyingTo(null);
       return;
     }
     sendTyping(true);
@@ -85,6 +125,29 @@ export function ChatRoomPage() {
     }
   };
 
+  const handleForwardSend = (targetRoomId: string) => {
+    if (!forwardingMessage) return;
+    forwardMessage(forwardingMessage.id, targetRoomId, forwardComment || undefined);
+    setForwardingMessage(null);
+    setForwardComment('');
+    setForwardSearch('');
+    setToast('転送しました');
+  };
+
+  // スレッドへの返信送信
+  const handleThreadSend = () => {
+    const trimmed = threadInput.trim();
+    if (!trimmed || !threadMessageId) return;
+    sendMessage(trimmed, threadMessageId);
+    setThreadInput('');
+    // スレッドを再読み込み
+    setTimeout(() => {
+      if (id && threadMessageId) {
+        api.getChatThread(id, threadMessageId).then(setThreadData);
+      }
+    }, 500);
+  };
+
   if (!room) return <main className="dc-layout"><div className="dc-center"><p className="dc-loading">読み込み中...</p></div></main>;
 
   const isOwner = room.myRole === 'owner';
@@ -101,7 +164,6 @@ export function ChatRoomPage() {
       const ts = new Date(msg.createdAt);
       const dateStr = `${ts.getFullYear()}年${ts.getMonth() + 1}月${ts.getDate()}日`;
 
-      // 日付区切り
       if (dateStr !== lastDate) {
         elements.push(<DateSeparator key={`date-${dateStr}`} date={dateStr} />);
         lastDate = dateStr;
@@ -109,11 +171,11 @@ export function ChatRoomPage() {
         lastTime = 0;
       }
 
-      // グルーピング: 同一著者 & 5分以内 & 通常メッセージ
       const grouped =
         msg.type === 'user' &&
         msg.authorId === lastAuthorId &&
-        ts.getTime() - lastTime < 5 * 60 * 1000;
+        ts.getTime() - lastTime < 5 * 60 * 1000 &&
+        !msg.parentMessage;  // 返信メッセージはグルーピングしない
 
       elements.push(
         <ChatMessageItem
@@ -123,6 +185,10 @@ export function ChatRoomPage() {
           onToggleReaction={toggleReaction}
           onEdit={msg.isMine ? editMessage : undefined}
           onDelete={msg.isMine || isOwner ? deleteMessage : undefined}
+          onReply={(m) => setReplyingTo(m)}
+          onPin={pinMessage}
+          onForward={(m) => setForwardingMessage(m)}
+          onOpenThread={(msgId) => setThreadMessageId(msgId)}
         />
       );
 
@@ -136,6 +202,11 @@ export function ChatRoomPage() {
     }
     return elements;
   };
+
+  // 転送モーダル用: フィルタされたルーム
+  const filteredForwardRooms = forwardRooms.filter(
+    (r) => r.id !== id && r.name.toLowerCase().includes(forwardSearch.toLowerCase())
+  );
 
   return (
     <div className="dc-layout">
@@ -193,6 +264,16 @@ export function ChatRoomPage() {
             )}
           </div>
 
+          {/* 返信プレビュー */}
+          {replyingTo && (
+            <div className="dc-reply-preview">
+              <div className="dc-reply-preview-bar" />
+              <span className="dc-reply-preview-label">↩️ {replyingTo.author.name} に返信</span>
+              <span className="dc-reply-preview-text">{replyingTo.body.slice(0, 80)}</span>
+              <button className="dc-reply-preview-close" onClick={() => setReplyingTo(null)}>✕</button>
+            </div>
+          )}
+
           {/* 入力 */}
           <div className="dc-input-area">
             <textarea
@@ -200,17 +281,69 @@ export function ChatRoomPage() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`#${room.name} へメッセージを送信`}
+              placeholder={replyingTo ? `${replyingTo.author.name} に返信...` : `#${room.name} へメッセージを送信`}
               rows={1}
             />
           </div>
         </div>
 
-        {/* ===== 右サイドバー: メンバー一覧 ===== */}
-        {showMembers && (
+        {/* ===== スレッドペイン ===== */}
+        {threadMessageId && (
+          <aside className="dc-thread-pane">
+            <div className="dc-thread-header">
+              <h3>スレッド</h3>
+              <button className="dc-thread-close" onClick={() => { setThreadMessageId(null); setThreadData(null); }}>✕</button>
+            </div>
+            <div className="dc-thread-messages">
+              {threadLoading && <p className="dc-loading">読み込み中...</p>}
+              {threadData && (
+                <>
+                  {/* 親メッセージ */}
+                  <ChatMessageItem
+                    key={threadData.parent.id}
+                    message={threadData.parent}
+                    grouped={false}
+                    onToggleReaction={toggleReaction}
+                    onEdit={threadData.parent.isMine ? editMessage : undefined}
+                    onDelete={threadData.parent.isMine || isOwner ? deleteMessage : undefined}
+                  />
+                  <div className="dc-thread-divider">
+                    <span>{threadData.replies.length}件の返信</span>
+                  </div>
+                  {/* 返信一覧 */}
+                  {threadData.replies.map((reply) => (
+                    <ChatMessageItem
+                      key={reply.id}
+                      message={reply}
+                      grouped={false}
+                      onToggleReaction={toggleReaction}
+                      onEdit={reply.isMine ? editMessage : undefined}
+                      onDelete={reply.isMine || isOwner ? deleteMessage : undefined}
+                    />
+                  ))}
+                </>
+              )}
+            </div>
+            {/* スレッド入力 */}
+            <div className="dc-thread-input-area">
+              <textarea
+                className="dc-input"
+                value={threadInput}
+                onChange={(e) => setThreadInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleThreadSend(); }
+                }}
+                placeholder="スレッドに返信..."
+                rows={1}
+              />
+            </div>
+          </aside>
+        )}
+
+        {/* ===== 右サイドバー: メンバー一覧 (スレッドペインが開いてないときのみ) ===== */}
+        {showMembers && !threadMessageId && (
           <aside className="dc-sidebar">
             <h3 className="dc-sidebar-title">メンバー — {room.members.length}</h3>
-            {/* 管理者 */}
             {room.members.filter((m) => m.role === 'owner').length > 0 && (
               <>
                 <div className="dc-sidebar-section">管理者 — {room.members.filter((m) => m.role === 'owner').length}</div>
@@ -222,7 +355,6 @@ export function ChatRoomPage() {
                 ))}
               </>
             )}
-            {/* メンバー */}
             {room.members.filter((m) => m.role === 'member').length > 0 && (
               <>
                 <div className="dc-sidebar-section">メンバー — {room.members.filter((m) => m.role === 'member').length}</div>
@@ -238,6 +370,60 @@ export function ChatRoomPage() {
         )}
       </div>
 
+      {/* ===== 転送モーダル ===== */}
+      {forwardingMessage && (
+        <div className="dc-modal-overlay" onClick={() => setForwardingMessage(null)}>
+          <div className="dc-forward-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="dc-forward-header">
+              <h3>転送先</h3>
+              <button className="dc-forward-close" onClick={() => setForwardingMessage(null)}>✕</button>
+            </div>
+            <p className="dc-forward-desc">このメッセージを共有する場所を選んでください。</p>
+
+            <input
+              className="dc-forward-search"
+              type="text"
+              placeholder="🔍 検索"
+              value={forwardSearch}
+              onChange={(e) => setForwardSearch(e.target.value)}
+            />
+
+            <div className="dc-forward-list">
+              {filteredForwardRooms.map((r) => (
+                <button
+                  key={r.id}
+                  className="dc-forward-room"
+                  onClick={() => handleForwardSend(r.id)}
+                >
+                  <span className="dc-forward-room-emoji">{r.emoji || '#'}</span>
+                  <div className="dc-forward-room-info">
+                    <span className="dc-forward-room-name">{r.name}</span>
+                    {r.description && <span className="dc-forward-room-desc">{r.description}</span>}
+                  </div>
+                </button>
+              ))}
+              {filteredForwardRooms.length === 0 && (
+                <p className="dc-forward-empty">ルームが見つかりません</p>
+              )}
+            </div>
+
+            {/* 転送元メッセージプレビュー */}
+            <div className="dc-forward-preview">
+              <span className="dc-forward-preview-body">{forwardingMessage.body.slice(0, 100)}</span>
+            </div>
+
+            <div className="dc-forward-footer">
+              <input
+                className="dc-forward-comment"
+                type="text"
+                placeholder="オプションのメッセージを追加..."
+                value={forwardComment}
+                onChange={(e) => setForwardComment(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

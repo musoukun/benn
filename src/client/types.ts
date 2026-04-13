@@ -208,10 +208,17 @@ export type ChatRoomFull = {
   myRole: 'owner' | 'member' | null; unreadCount: number;
   members: ChatRoomMember[]; createdAt: string;
 };
+export type ChatMessageParent = {
+  id: string; body: string; authorId: string;
+  author: { id: string; name: string; avatarUrl: string | null };
+};
 export type ChatMessage = {
   id: string; roomId: string; body: string; type: 'user' | 'system' | 'meet';
   authorId: string; author: { id: string; name: string; avatarUrl: string | null };
   editedAt: string | null; isMine: boolean; reactions: ReactionGroup[];
+  pinnedAt: string | null; pinnedById: string | null;
+  parentMessage: ChatMessageParent | null;
+  replyCount: number;
   createdAt: string; updatedAt: string;
 };
 export type ReactionGroup = {

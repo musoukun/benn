@@ -4,11 +4,10 @@ import type { ReactionGroup } from '../types';
 type Props = {
   reactions: ReactionGroup[];
   onToggle: (emoji: string) => void;
-  onPickerOpen?: () => void;
 };
 
-export function ReactionBar({ reactions, onToggle, onPickerOpen }: Props) {
-  if (reactions.length === 0 && !onPickerOpen) return null;
+export function ReactionBar({ reactions, onToggle }: Props) {
+  if (reactions.length === 0) return null;
 
   return (
     <div className="reaction-bar">
@@ -23,11 +22,6 @@ export function ReactionBar({ reactions, onToggle, onPickerOpen }: Props) {
           <span className="reaction-count">{r.count}</span>
         </button>
       ))}
-      {onPickerOpen && (
-        <button className="reaction-pill reaction-add" onClick={onPickerOpen} title="リアクションを追加">
-          +
-        </button>
-      )}
     </div>
   );
 }
