@@ -15,6 +15,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { CommunitiesPage } from './pages/CommunitiesPage';
 import { CommunityPage } from './pages/CommunityPage';
+import { CommunityEditorPage } from './pages/CommunityEditorPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { SummarizePage } from './pages/SummarizePage';
 import { AggregatePage } from './pages/AggregatePage';
@@ -80,6 +81,22 @@ export function App() {
         />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/communities/:id" element={<CommunityPage />} />
+        <Route
+          path="/communities/:communityId/editor"
+          element={
+            <RequireAuth>
+              <CommunityEditorPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/communities/:communityId/editor/:id"
+          element={
+            <RequireAuth>
+              <CommunityEditorPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/me/settings"
           element={

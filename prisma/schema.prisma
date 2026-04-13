@@ -66,9 +66,9 @@ model Article {
   scheduledAt DateTime?
 
   // 閲覧制御
-  // visibility: "public" | "affiliation_in" | "affiliation_out"
+  // visibility: "public" | "friends_only" (旧: "affiliation_in" | "affiliation_out" は廃止)
   visibility               String  @default("public")
-  // CSV of affiliation IDs
+  // (レガシー) CSV of affiliation IDs — 旧仕様の名残。新規作成では使用しない
   visibilityAffiliationIds String  @default("")
 
   // コミュニティ投稿 / 承認ワークフロー

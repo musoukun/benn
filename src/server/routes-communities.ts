@@ -97,49 +97,46 @@ export type TimelineRow = {
   visibilityUserIds: string;
 };
 
-// タイムラインを「閲覧」できるか判定
-//   - コミュニティが非公開系 (private, affiliation_*) で非メンバー → 常に不可
-//   - public タイムライン → 誰でも可 (ただし community の可視性は別途判定)
-//   - members_only → メンバーなら可
-//   - affiliation_in → 指定所属に属するメンバーなら可
-//   - selected_users → 指定ユーザー or owner なら可
+// タイムラインを「閲覧」できるか判定 (X モデル)
+//   - public タイムライン → 誰でも可 (コミュニティの可視性を問わない)
+//   - members_only → コミュニティメンバーのみ (鍵タイムライン)
+//   - affiliation_in → 指定所属に属するメンバーのみ
+//   - selected_users → 指定ユーザー (全アプリユーザーから選択可) or owner
 export async function canAccessTimeline(
   tl: TimelineRow,
   user: { id: string } | null
 ): Promise<boolean> {
-  // 親コミュニティの可視性もチェック
+  // public TL は誰でも閲覧可 (コミュニティの可視性に依存しない)
+  if (tl.visibility === 'public') return true;
+
+  // 以下は鍵系 TL — ユーザー情報が必要
+  if (!user) return false;
+
   const community = await prisma.community.findUnique({
     where: { id: tl.communityId },
     select: { visibility: true, visibilityAffiliationIds: true },
   });
   if (!community) return false;
 
-  const member = user
-    ? await prisma.communityMember.findUnique({
-        where: { userId_communityId: { userId: user.id, communityId: tl.communityId } },
-      })
-    : null;
-  const myAffIds = user ? await loadMyAffiliationIds(user.id) : new Set<string>();
+  const member = await prisma.communityMember.findUnique({
+    where: { userId_communityId: { userId: user.id, communityId: tl.communityId } },
+  });
 
-  // コミュニティ自体が見えないならタイムラインも見えない
-  if (!isCommunityVisibleTo(community, !!member, myAffIds)) return false;
-
-  // タイムライン側の visibility
   switch (tl.visibility) {
-    case 'public':
-      return true;
     case 'members_only':
       return !!member;
     case 'affiliation_in': {
       if (!member) return false;
+      const myAffIds = await loadMyAffiliationIds(user.id);
       const ids = (tl.visibilityAffiliationIds || '').split(',').filter(Boolean);
       return ids.some((id) => myAffIds.has(id));
     }
     case 'selected_users': {
-      if (!member) return false;
-      if (member.role === 'owner') return true;
+      // owner は常にアクセス可
+      if (member?.role === 'owner') return true;
+      // アプリ全ユーザーから指定可能 — メンバーでなくても visibilityUserIds に含まれていれば OK
       const ids = (tl.visibilityUserIds || '').split(',').filter(Boolean);
-      return ids.includes(user!.id);
+      return ids.includes(user.id);
     }
     default:
       return !!member;
@@ -159,38 +156,37 @@ async function filterAccessibleTimelines(
 }
 
 // 許容される timeline visibility を community の visibility から決める。
-// 仕様:
-//   - community public   → members_only / selected_users / public / affiliation_in
-//   - community private  → members_only / selected_users (+ admin なら affiliation_in)
-//   - community affiliation_* → 既存同様 (members_only / affiliation_in / selected_users)
+// X モデル: どのコミュニティでも public / members_only / selected_users を選べる。
+// affiliation_in は所属ベースコミュニティでのみ利用可。
 // 不正値は 'members_only' に fallback。
 function normalizeTimelineVisibility(
   requested: string | undefined,
   communityVisibility: string
 ): 'public' | 'members_only' | 'affiliation_in' | 'selected_users' {
   const r = requested || 'members_only';
-  if (r === 'public') {
-    // コミュニティが public のときのみ public TL を許可
-    return communityVisibility === 'public' ? 'public' : 'members_only';
-  }
+  if (r === 'public') return 'public';
   if (r === 'selected_users') return 'selected_users';
-  if (r === 'affiliation_in') return 'affiliation_in';
+  if (r === 'affiliation_in') {
+    const isAff = communityVisibility === 'affiliation_in' || communityVisibility === 'affiliation_out';
+    return isAff ? 'affiliation_in' : 'members_only';
+  }
   return 'members_only';
 }
 
-// selected_users の対象ユーザー ID を、実際にコミュニティメンバーである ID のみに絞って CSV 化
+// selected_users の対象ユーザー ID を、実在するアプリユーザーの ID のみに絞って CSV 化
+// (X モデル: コミュニティメンバーに限定せず、全ユーザーから選択可能)
 async function sanitizeTimelineUserIds(
-  communityId: string,
+  _communityId: string,
   input: unknown
 ): Promise<string> {
   if (!Array.isArray(input)) return '';
   const raw = input.filter((x): x is string => typeof x === 'string' && !!x);
   if (raw.length === 0) return '';
-  const members = await prisma.communityMember.findMany({
-    where: { communityId, userId: { in: raw } },
-    select: { userId: true },
+  const users = await prisma.user.findMany({
+    where: { id: { in: raw } },
+    select: { id: true },
   });
-  const ok = new Set(members.map((m) => m.userId));
+  const ok = new Set(users.map((u) => u.id));
   return raw.filter((id) => ok.has(id)).join(',');
 }
 

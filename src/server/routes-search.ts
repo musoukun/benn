@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { User } from '@prisma/client';
 import { prisma } from './db';
+import { filterByVisibility } from './routes';
 
 export const searchRoutes = new Hono<{ Variables: { user: User | null } }>();
 
@@ -38,17 +39,17 @@ searchRoutes.get('/', async (c) => {
         communityId: true,
       },
     });
-    // visibility はクライアントに渡す前に粗く弾く (community / private)
-    const filtered = items.filter((a) => !a.communityId);
+    // visibility フィルタ (friends_only / community 記事)
+    const filtered = await filterByVisibility(items as any, me?.id || null);
     return c.json({
-      items: filtered.map((a) => ({
+      items: filtered.map((a: any) => ({
         id: a.id,
         title: a.title,
         emoji: a.emoji,
         type: a.type,
         publishedAt: a.publishedAt,
         author: a.author,
-        topics: a.topics.map((t) => t.topic),
+        topics: a.topics.map((t: any) => t.topic),
         likeCount: a._count.likes,
       })),
     });

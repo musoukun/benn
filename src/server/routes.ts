@@ -411,14 +411,12 @@ async function saveArticle(
   const type = input.type === 'diary' ? 'diary' : input.type === 'howto' ? 'howto' : '';
   const topicNames = (input.topicNames || []).slice(0, 5);
 
-  // visibility
+  // visibility: "public" | "friends_only"
   const visibility =
-    input.visibility === 'affiliation_in' ||
-    input.visibility === 'affiliation_out' ||
-    input.visibility === 'public'
-      ? input.visibility
+    input.visibility === 'friends_only'
+      ? 'friends_only'
       : 'public';
-  const visibilityAffiliationIds = (input.visibilityAffiliationIds || []).join(',');
+  const visibilityAffiliationIds = ''; // レガシー (未使用)
 
   // schedule
   let scheduledAt: Date | null = null;
@@ -529,36 +527,36 @@ async function saveArticle(
   }
 }
 
-// 閲覧者(me)の所属に基づき、記事配列をフィルタリング
+// 閲覧者(me)の公開範囲に基づき、記事配列をフィルタリング
+// visibility: "public" (全体公開) | "friends_only" (相互フォローのみ)
 async function filterByVisibility<T extends {
   visibility: string;
-  visibilityAffiliationIds: string;
   authorId: string;
   communityId: string | null;
 }>(items: T[], meId: string | null): Promise<T[]> {
-  let myAffIds = new Set<string>();
   let myCommunityIds = new Set<string>();
+  let mutualFriendIds = new Set<string>();
   if (meId) {
-    const [a, m] = await Promise.all([
-      prisma.userAffiliation.findMany({ where: { userId: meId } }),
+    const [memberships, iFollow, followMe] = await Promise.all([
       prisma.communityMember.findMany({ where: { userId: meId } }),
+      prisma.follow.findMany({ where: { userId: meId, targetType: 'user' }, select: { targetId: true } }),
+      prisma.follow.findMany({ where: { targetType: 'user', targetId: meId }, select: { userId: true } }),
     ]);
-    myAffIds = new Set(a.map((x) => x.affiliationId));
-    myCommunityIds = new Set(m.map((x) => x.communityId));
+    myCommunityIds = new Set(memberships.map((x) => x.communityId));
+    // 相互フォロー = 自分がフォローしている & 相手もフォローしてくれている
+    const iFollowSet = new Set(iFollow.map((x) => x.targetId));
+    for (const f of followMe) {
+      if (iFollowSet.has(f.userId)) mutualFriendIds.add(f.userId);
+    }
   }
   return items.filter((it) => {
     if (it.authorId === meId) return true;
     if (it.communityId) {
-      // コミュニティ記事はメンバーのみ
       if (!meId || !myCommunityIds.has(it.communityId)) return false;
     }
     if (it.visibility === 'public') return true;
-    const ids = (it.visibilityAffiliationIds || '').split(',').filter(Boolean);
-    if (it.visibility === 'affiliation_in') {
-      return ids.some((aid) => myAffIds.has(aid));
-    }
-    if (it.visibility === 'affiliation_out') {
-      return !ids.some((aid) => myAffIds.has(aid));
+    if (it.visibility === 'friends_only') {
+      return meId != null && mutualFriendIds.has(it.authorId);
     }
     return true;
   });

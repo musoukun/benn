@@ -267,11 +267,11 @@ export function CommunityPage() {
           {isMember && (
             <>
               <Link
-                to={`/editor?communityId=${c.id}&timelineId=${activeTimelineId || ''}`}
+                to={`/communities/${c.id}/editor${activeTimelineId ? `?timelineId=${activeTimelineId}` : ''}`}
                 className="btn"
                 style={{ marginLeft: 'auto' }}
               >
-                ✏ このコミュニティに投稿
+                ✏ このコミュニティに記事を書く
               </Link>
               <button
                 type="button"
@@ -815,6 +815,7 @@ function TimelineManager({
   const [newName, setNewName] = useState('');
   const [newVis, setNewVis] = useState<TimelineVisibility>('members_only');
   const [newUserIds, setNewUserIds] = useState<string[]>([]);
+  const [newSelectedUsers, setNewSelectedUsers] = useState<Array<{ id: string; name: string; avatarUrl: string | null }>>([]);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -822,18 +823,23 @@ function TimelineManager({
     community.visibility === 'affiliation_in' ||
     community.visibility === 'affiliation_out';
 
-  // 選択可能モード (コミュニティ visibility に合わせる)
+  // 選択可能モード — X モデル: public(全体公開) / members_only(鍵) / selected_users(指定ユーザー)
   const modeOptions: { value: TimelineVisibility; label: string; hint: string }[] = (() => {
     const base: { value: TimelineVisibility; label: string; hint: string }[] = [
       {
+        value: 'public',
+        label: '🌐 全体公開',
+        hint: 'フォローしている人のフィードに流れます。コミュニティ外の誰でも閲覧できます',
+      },
+      {
         value: 'members_only',
-        label: '🔒 メンバーのみ',
-        hint: 'このコミュニティのメンバー全員が閲覧・投稿できます',
+        label: '🔒 メンバーのみ (鍵)',
+        hint: 'コミュニティのメンバーだけが閲覧・投稿できます。フォローしても見れません',
       },
       {
         value: 'selected_users',
-        label: '👥 指定ユーザーのみ',
-        hint: '選んだメンバー + 代表だけが閲覧・投稿できます',
+        label: '👥 指定ユーザーのみ (鍵)',
+        hint: '選んだユーザー + 代表だけが閲覧・投稿できます。アプリの全ユーザーから選べます',
       },
     ];
     if (isAffiliationBased) {
@@ -866,6 +872,7 @@ function TimelineManager({
       setNewName('');
       setNewVis('members_only');
       setNewUserIds([]);
+      setNewSelectedUsers([]);
       onChanged();
     } catch (e) {
       onError(e instanceof Error ? e.message : '作成に失敗しました');
@@ -880,9 +887,11 @@ function TimelineManager({
       <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 12 }}>
         タイムラインはコミュニティ内のチャンネルです。「ホーム」は必ず存在し、削除できません。
         {' '}
-        <strong>「指定ユーザーのみ」</strong>
-        を選ぶと、コミュニティ内の特定メンバーだけが閲覧・投稿できる限定チャンネルを作れます
-        (代表は常にアクセス可)。
+        <strong>🌐 全体公開</strong> はフォロワーのフィードに流れ、誰でも見れます。
+        {' '}
+        <strong>🔒 鍵付き</strong> はフォローしても見れません。
+        {' '}
+        <strong>👥 指定ユーザー</strong> はアプリの全ユーザーから選んで限定公開できます (代表は常にアクセス可)。
       </div>
 
       {/* 既存タイムライン一覧 */}
@@ -952,14 +961,17 @@ function TimelineManager({
         </div>
         {newVis === 'selected_users' && (
           <div style={{ marginTop: 10 }}>
-            <MemberPicker
-              members={community.members}
+            <UserSearchPicker
               selected={newUserIds}
-              onToggle={(id) =>
-                setNewUserIds((prev) =>
-                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                )
-              }
+              selectedUsers={newSelectedUsers}
+              onAdd={(u) => {
+                setNewUserIds((prev) => [...prev, u.id]);
+                setNewSelectedUsers((prev) => [...prev, u]);
+              }}
+              onRemove={(id) => {
+                setNewUserIds((prev) => prev.filter((x) => x !== id));
+                setNewSelectedUsers((prev) => prev.filter((x) => x.id !== id));
+              }}
             />
           </div>
         )}
@@ -992,13 +1004,36 @@ function TimelineRow({
     .filter(Boolean);
   const [vis, setVis] = useState<TimelineVisibility>(timeline.visibility);
   const [userIds, setUserIds] = useState<string[]>(initialUserIds);
+  const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; name: string; avatarUrl: string | null }>>([]);
   const [saving, setSaving] = useState(false);
 
   // timeline が外から更新されたら state を同期
   useEffect(() => {
     setVis(timeline.visibility);
     setUserIds((timeline.visibilityUserIds || '').split(',').filter(Boolean));
+    setSelectedUsers([]);
   }, [timeline.id, timeline.visibility, timeline.visibilityUserIds]);
+
+  // 既存の selected_users の名前を解決
+  useEffect(() => {
+    if (timeline.visibility !== 'selected_users' || initialUserIds.length === 0) return;
+    // コミュニティメンバーから名前を引ける分は引く、残りは API で取得
+    const known = community.members
+      .filter((m) => initialUserIds.includes(m.id))
+      .map((m) => ({ id: m.id, name: m.name, avatarUrl: m.avatarUrl }));
+    const unknownIds = initialUserIds.filter((id) => !known.find((k) => k.id === id));
+    if (unknownIds.length === 0) {
+      setSelectedUsers(known);
+    } else {
+      // 不明なユーザーは個別取得
+      Promise.all(unknownIds.map((id) => api.getUser(id).catch(() => null))).then((users) => {
+        const resolved = users
+          .filter((u) => u != null)
+          .map((u) => ({ id: u!.id, name: u!.name, avatarUrl: u!.avatarUrl }));
+        setSelectedUsers([...known, ...resolved]);
+      });
+    }
+  }, [timeline.id]);
 
   const dirty =
     vis !== timeline.visibility ||
@@ -1049,7 +1084,7 @@ function TimelineRow({
               onChange={(e) => {
                 const v = e.target.value as TimelineVisibility;
                 setVis(v);
-                if (v !== 'selected_users') setUserIds([]);
+                if (v !== 'selected_users') { setUserIds([]); setSelectedUsers([]); }
               }}
               style={{
                 padding: '6px 10px',
@@ -1072,14 +1107,17 @@ function TimelineRow({
           </div>
           {vis === 'selected_users' && (
             <div style={{ marginTop: 10 }}>
-              <MemberPicker
-                members={community.members}
+              <UserSearchPicker
                 selected={userIds}
-                onToggle={(id) =>
-                  setUserIds((prev) =>
-                    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-                  )
-                }
+                selectedUsers={selectedUsers}
+                onAdd={(u) => {
+                  setUserIds((prev) => [...prev, u.id]);
+                  setSelectedUsers((prev) => [...prev, u]);
+                }}
+                onRemove={(id) => {
+                  setUserIds((prev) => prev.filter((x) => x !== id));
+                  setSelectedUsers((prev) => prev.filter((x) => x.id !== id));
+                }}
               />
             </div>
           )}
@@ -1089,59 +1127,104 @@ function TimelineRow({
   );
 }
 
-function MemberPicker({
-  members,
+// 全ユーザー検索型ピッカー (selected_users 用)
+// コミュニティメンバーに限定せず、アプリ全ユーザーから選択可能
+function UserSearchPicker({
   selected,
-  onToggle,
+  selectedUsers,
+  onAdd,
+  onRemove,
 }: {
-  members: CommunityMember[];
   selected: string[];
-  onToggle: (id: string) => void;
+  selectedUsers: Array<{ id: string; name: string; avatarUrl: string | null }>;
+  onAdd: (user: { id: string; name: string; avatarUrl: string | null }) => void;
+  onRemove: (id: string) => void;
 }) {
-  if (members.length === 0) {
-    return (
-      <div style={{ color: 'var(--muted)', fontSize: 14 }}>
-        メンバーがまだいません
-      </div>
-    );
-  }
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<Array<{ id: string; name: string; avatarUrl: string | null }>>([]);
+  const debounceRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    if (!q.trim()) { setResults([]); return; }
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const r = await api.searchUsers(q.trim());
+        setResults(r.items);
+      } catch { setResults([]); }
+    }, 250);
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
+  }, [q]);
+
   return (
     <div>
       <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
-        対象メンバーを選択 (代表は常にアクセス可)
+        対象ユーザーを検索して追加 (代表は常にアクセス可)
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {members.map((m) => {
-          const on = selected.includes(m.id);
-          return (
-            <label
-              key={m.id}
-              className={`tag${on ? ' tag-on' : ''}`}
+      <input
+        type="text"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="名前またはメールで検索…"
+        style={{
+          width: '100%',
+          padding: '6px 10px',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          marginBottom: 8,
+          fontSize: 14,
+        }}
+      />
+      {q.trim() && results.length > 0 && (
+        <div style={{
+          maxHeight: 180, overflowY: 'auto',
+          border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8,
+        }}>
+          {results.map((u) => {
+            const already = selected.includes(u.id);
+            return (
+              <div
+                key={u.id}
+                onClick={() => !already && onAdd(u)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', borderBottom: '1px solid var(--border)',
+                  cursor: already ? 'not-allowed' : 'pointer',
+                  opacity: already ? 0.5 : 1, fontSize: 14,
+                }}
+              >
+                <span style={{ flex: 1 }}>{u.name}</span>
+                {already && <span style={{ color: 'var(--muted)', fontSize: 12 }}>追加済</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {selectedUsers.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {selectedUsers.map((u) => (
+            <span
+              key={u.id}
+              className="tag tag-on"
               style={{
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 10px',
-                borderRadius: 999,
-                border: '1px solid var(--border)',
-                background: on ? 'var(--accent)' : 'transparent',
-                color: on ? '#fff' : 'inherit',
-                fontSize: 14,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 999,
+                background: 'var(--accent)', color: '#fff', fontSize: 14,
               }}
-              title={m.role === 'owner' ? '代表は常にアクセス可' : undefined}
             >
-              <input
-                type="checkbox"
-                checked={on}
-                onChange={() => onToggle(m.id)}
-                style={{ display: 'none' }}
-              />
-              {m.role === 'owner' ? '★ ' : ''}{m.name}
-            </label>
-          );
-        })}
-      </div>
+              {u.name}
+              <button
+                type="button"
+                onClick={() => onRemove(u.id)}
+                style={{
+                  background: 'none', border: 'none', color: '#fff',
+                  cursor: 'pointer', fontSize: 14, padding: '0 2px',
+                }}
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

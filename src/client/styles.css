@@ -78,6 +78,8 @@
 [data-theme="dark"] .account-menu-item:hover,
 [data-theme="dark"] .notif-item a:hover { background: rgba(95,207,220,.12); color: var(--text); }
 [data-theme="dark"] .account-menu-logout:hover { background: rgba(239,68,68,.18); color: #fca5a5; }
+[data-theme="dark"] .post-url-card { background: #1e293b; border-color: var(--border); }
+[data-theme="dark"] .post-url-card-image { background-color: #334155; }
 [data-theme="dark"] .post-url-card:hover,
 [data-theme="dark"] .post-action:hover,
 [data-theme="dark"] .icon-btn:hover,
@@ -436,8 +438,8 @@ textarea.editor-pane:focus { border-color: var(--accent); }
 .post-composer { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 16px; }
 .post-composer-editor { border: 1px solid var(--border); border-radius: 8px; min-height: 96px; font-size: 16px; transition: border-color .15s, box-shadow .15s; overflow: hidden; }
 .post-composer-editor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(95,207,220,.18); }
-.post-composer-editor .milkdown { background: transparent; }
-.post-composer-editor .milkdown .ProseMirror { padding: 10px 12px !important; min-height: 76px; font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; font-size: 16px; line-height: 1.6; color: var(--text); }
+.post-composer-editor .milkdown { background: transparent; font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif !important; }
+.post-composer-editor .milkdown .ProseMirror { padding: 10px 12px !important; min-height: 76px; font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif !important; font-size: 16px; line-height: 1.6; color: var(--text); }
 .post-composer-editor .milkdown .ProseMirror p { margin: 0 0 4px; font-size: 16px; }
 .post-composer-editor .milkdown .ProseMirror h1 { font-size: 26px; font-weight: 800; line-height: 1.3; margin: 10px 0 6px; }
 .post-composer-editor .milkdown .ProseMirror h2 { font-size: 22px; font-weight: 800; line-height: 1.35; margin: 10px 0 6px; }

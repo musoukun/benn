@@ -37,8 +37,8 @@ export type ArticleListItem = {
   createdAt: string;
   updatedAt: string;
   scheduledAt?: string | null;
-  visibility?: 'public' | 'affiliation_in' | 'affiliation_out';
-  visibilityAffiliationIds?: string;
+  visibility?: 'public' | 'friends_only';
+  visibilityAffiliationIds?: string; // レガシー (未使用)
   communityId?: string | null;
   timelineId?: string | null;
   approvalStatus?: 'draft' | 'pending' | 'approved' | 'rejected';
