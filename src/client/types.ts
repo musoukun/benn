@@ -232,3 +232,60 @@ export type PublicRoom = {
   visibility: 'public'; memberCount: number;
   myRole: 'owner' | 'member' | null; createdAt: string;
 };
+
+// パルスサーベイ (7次元 15問, 10点満点)
+export type DimensionScores = {
+  direction: number;
+  alignment: number;
+  fairness: number;
+  leadership: number;
+  execution: number;
+  value: number;
+  safety: number;
+};
+
+export type PulseSurveySummary = {
+  id: string;
+  affiliationId: string;
+  affiliationName?: string;
+  periodLabel: string;
+  status: 'open' | 'closed';
+  responseCount: number;
+  memberCount: number;
+  opensAt: string;
+  closesAt: string;
+  createdAt?: string;
+  myResponseExists?: boolean;
+};
+
+export type PulseSurveyDetail = PulseSurveySummary & {
+  averages: Record<string, number>;
+  dimensions: DimensionScores;
+  overall: number;
+  myResponseExists: boolean;
+};
+
+export type PulseTrendData = {
+  periodLabel: string;
+  dimensions: DimensionScores;
+  overall: number;
+  responseRate: number;
+  responseCount: number;
+};
+
+export type PulseMyTrendItem = {
+  periodLabel: string;
+  affiliationName: string;
+  dimensions: DimensionScores;
+  overall: number;
+  createdAt: string;
+};
+
+export type PulseMonthlyData = {
+  month: string;
+  weekCount: number;
+  dimensions: DimensionScores;
+  overall: number;
+  responseRate: number;
+  responseCount: number;
+};

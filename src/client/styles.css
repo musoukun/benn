@@ -1144,3 +1144,228 @@ textarea.editor-pane:focus { border-color: var(--accent); }
   background: rgba(128,128,128,.1); transition: background .15s;
 }
 .mini-profile-btn:hover { background: rgba(128,128,128,.2); }
+
+/* ============================================================
+   パルスサーベイ
+   ============================================================ */
+
+.pulse-page { max-width: 720px; margin: 0 auto; padding: 24px; }
+.pulse-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.pulse-header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; }
+.pulse-back { color: var(--muted); display: flex; align-items: center; }
+.pulse-back:hover { color: var(--text); }
+
+.pulse-content { margin-top: 16px; }
+
+/* バッジ (未回答ドット) */
+.pulse-badge {
+  position: absolute; top: 4px; right: -2px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--like); display: inline-block;
+}
+
+/* ---------- フォーム ---------- */
+.pulse-form { display: flex; flex-direction: column; gap: 20px; }
+
+.pulse-progress {
+  position: relative; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.pulse-progress-bar {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.pulse-progress-text {
+  position: absolute; right: 0; top: -18px; font-size: 0.75rem; color: var(--muted);
+}
+
+.pulse-dimension-group { display: flex; flex-direction: column; gap: 12px; }
+.pulse-dimension-header {
+  display: flex; align-items: center; gap: 6px;
+  font-weight: 600; font-size: 0.9rem; color: var(--accent-dark);
+  padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+
+.pulse-question { display: flex; flex-direction: column; gap: 8px; }
+.pulse-question-text { margin: 0; font-size: 0.9rem; color: var(--text); }
+
+/* Likert スケール */
+.likert-scale {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.likert-btn {
+  flex: 1; min-width: 56px; padding: 10px 4px;
+  border: 2px solid var(--border); border-radius: 8px;
+  background: var(--card); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: all 0.15s ease;
+}
+.likert-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.likert-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft-20);
+  transform: scale(1.05);
+}
+.likert-btn.selected.low { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.likert-btn.selected.mid { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+.likert-btn.selected.high { border-color: var(--accent); background: var(--accent-soft-20); }
+.likert-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.likert-num { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.likert-label { font-size: 0.6rem; color: var(--muted); text-align: center; line-height: 1.2; }
+
+/* コメント */
+.pulse-comment-section { display: flex; flex-direction: column; gap: 4px; }
+.pulse-comment-label { font-size: 0.8rem; color: var(--muted); }
+.pulse-comment {
+  width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--text); font-size: 0.9rem;
+  resize: vertical;
+}
+
+/* 送信ボタン */
+.pulse-submit {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 24px; font-size: 1rem;
+}
+.pulse-submit-ready {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 207, 220, 0.4); }
+  50% { box-shadow: 0 0 16px 4px rgba(95, 207, 220, 0.3); }
+}
+
+/* ---------- 回答済み ---------- */
+.pulse-already-responded {
+  text-align: center; padding: 32px 20px;
+}
+.pulse-check-icon { color: var(--accent); margin-bottom: 8px; }
+.pulse-already-responded h2 { margin: 0 0 8px; font-size: 1.3rem; }
+.pulse-streak {
+  font-size: 1rem; font-weight: 700; color: var(--accent);
+  margin-bottom: 8px;
+}
+.pulse-period {
+  font-size: 0.85rem; color: var(--muted); font-family: monospace;
+}
+.pulse-rate-info { font-size: 0.85rem; color: var(--muted); margin: 4px 0 12px; }
+.btn-danger-text { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+.btn-danger-text:hover { background: rgba(239, 68, 68, 0.08); }
+
+/* サーベイ情報 */
+.pulse-survey-info {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.pulse-deadline { font-size: 0.8rem; color: var(--muted); }
+
+/* ---------- 結果 ---------- */
+.pulse-results { display: flex; flex-direction: column; gap: 16px; }
+
+.pulse-summary-row {
+  display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap;
+}
+.pulse-mood { text-align: center; padding: 24px 32px; }
+.pulse-mood-score { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+.pulse-mood-text { font-size: 1rem; margin-top: 4px; color: var(--text); }
+.pulse-mood-sub { font-size: 0.75rem; color: var(--muted); }
+
+.pulse-rate-ring { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pulse-rate-label { font-size: 0.75rem; color: var(--muted); }
+
+/* レーダー */
+.pulse-radar-card { text-align: center; }
+.pulse-radar-card h3 { margin: 0 0 12px; font-size: 1rem; }
+.pulse-radar { display: block; margin: 0 auto; }
+
+/* 棒グラフ */
+.pulse-bars-card h3 { margin: 0 0 12px; font-size: 1rem; }
+.pulse-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.pulse-bar-label { width: 100px; font-size: 0.8rem; color: var(--muted); text-align: right; flex-shrink: 0; }
+.pulse-bar-track { flex: 1; height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+.pulse-bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease; }
+.pulse-bar-value { width: 32px; font-size: 0.8rem; font-weight: 600; text-align: right; }
+
+/* ---------- トレンド ---------- */
+.pulse-trends { display: flex; flex-direction: column; gap: 16px; }
+.pulse-trends h3 { margin: 0 0 8px; font-size: 1rem; }
+.pulse-trends h4 { margin: 0 0 8px; font-size: 0.9rem; color: var(--text); }
+
+.pulse-sparkline-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pulse-sparkline-label { width: 64px; font-size: 0.8rem; font-weight: 600; text-align: right; flex-shrink: 0; }
+.pulse-sparkline-svg { flex-shrink: 0; }
+.pulse-sparkline-value { width: 32px; font-size: 0.8rem; font-weight: 700; }
+
+/* ジャンル別スコア (先週比・先月比) */
+.pulse-genre-scores { display: flex; flex-direction: column; gap: 0; }
+.pulse-genre-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pulse-genre-row:last-child { border-bottom: none; }
+.pulse-genre-label { display: flex; align-items: center; gap: 6px; width: 120px; flex-shrink: 0; }
+.pulse-genre-name { font-size: 0.85rem; font-weight: 600; }
+.pulse-genre-score { font-size: 1.2rem; font-weight: 800; width: 48px; text-align: right; }
+.pulse-genre-diffs { display: flex; gap: 8px; margin-left: auto; }
+.pulse-diff { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.pulse-diff-up { color: #059669; background: rgba(5, 150, 105, 0.1); }
+.pulse-diff-down { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+.pulse-diff-same { color: var(--muted); background: var(--accent-soft-10); }
+.pulse-diff-na { color: var(--muted); }
+
+.pulse-rate-trend { margin-top: 4px; }
+.pulse-rate-trend-svg { display: block; margin: 0 auto; }
+
+/* ---------- 履歴 ---------- */
+.pulse-history { display: flex; flex-direction: column; gap: 8px; }
+.pulse-history-item { cursor: pointer; transition: transform 0.1s; }
+.pulse-history-item:hover { transform: translateY(-1px); }
+.pulse-history-main { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pulse-status { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; }
+.pulse-status-open { background: rgba(95, 207, 220, 0.15); color: var(--accent-dark); }
+.pulse-status-closed { background: rgba(128, 128, 128, 0.1); color: var(--muted); }
+.pulse-history-meta { font-size: 0.8rem; color: var(--muted); display: flex; gap: 16px; }
+
+/* サーベイなし */
+.pulse-no-survey { text-align: center; padding: 32px 20px; }
+.pulse-no-survey p { color: var(--muted); margin-bottom: 12px; }
+
+/* ---------- ダッシュボード ---------- */
+.pulse-page-title { font-size: 1.4rem; font-weight: 700; margin: 0 0 4px; }
+.pulse-page-desc { font-size: 0.85rem; color: var(--muted); margin: 0 0 16px; }
+
+.pulse-admin-card h3 { margin: 0 0 8px; font-size: 0.95rem; }
+.pulse-admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pulse-survey-list { display: flex; flex-direction: column; gap: 12px; }
+.pulse-survey-card { padding: 16px; }
+.pulse-survey-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;
+}
+.pulse-aff-name { font-weight: 600; font-size: 0.95rem; margin-right: 8px; }
+.pulse-survey-card-meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; }
+.pulse-survey-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.pulse-responded-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.8rem; color: var(--accent-dark); font-weight: 600;
+}
+
+.pulse-streak-banner {
+  text-align: center; padding: 12px; margin-top: 16px;
+  font-weight: 700; font-size: 1rem; color: var(--accent);
+  background: var(--accent-soft-10); border-radius: 8px;
+}
+
+.pulse-aff-selector { margin-bottom: 16px; }
+.pulse-aff-selector select { width: 100%; max-width: 300px; }
+
+/* ---------- レスポンシブ ---------- */
+@media (max-width: 600px) {
+  .pulse-page { padding: 12px; }
+  .likert-btn { min-width: 48px; padding: 8px 2px; }
+  .likert-label { display: none; }
+  .pulse-bar-label { width: 72px; font-size: 0.7rem; }
+  .pulse-summary-row { flex-direction: column; }
+  .pulse-survey-card-header { flex-direction: column; gap: 4px; }
+  .pulse-admin-actions { flex-direction: column; }
+}

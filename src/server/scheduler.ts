@@ -25,6 +25,15 @@ export function startScheduler() {
         });
       }
       console.log(`[scheduler] published ${due.length} scheduled article(s)`);
+
+      // パルスサーベイの自動クローズ (closesAt を過ぎた open サーベイ)
+      const expired = await prisma.pulseSurvey.updateMany({
+        where: { status: 'open', closesAt: { lte: now } },
+        data: { status: 'closed' },
+      });
+      if (expired.count > 0) {
+        console.log(`[scheduler] closed ${expired.count} expired pulse survey(s)`);
+      }
     } catch (e) {
       console.error('[scheduler] error', e);
     }

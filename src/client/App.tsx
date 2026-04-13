@@ -25,6 +25,7 @@ import { AdminSettingPage } from './pages/AdminSettingPage';
 import { ChatRoomsPage } from './pages/ChatRoomsPage';
 import { ChatRoomPage } from './pages/ChatRoomPage';
 import { ChatRoomSettingsPage } from './pages/ChatRoomSettingsPage';
+import { PulseSurveyPage } from './pages/PulseSurveyPage';
 
 export function App() {
   return (
@@ -108,6 +109,14 @@ export function App() {
         />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/communities/:id" element={<CommunityPage />} />
+        <Route
+          path="/pulse"
+          element={
+            <RequireAuth>
+              <PulseSurveyPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/communities/:communityId/editor"
           element={

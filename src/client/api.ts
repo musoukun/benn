@@ -17,6 +17,10 @@ import type {
   Notification,
   Post,
   PublicRoom,
+  PulseMyTrendItem,
+  PulseSurveyDetail,
+  PulseSurveySummary,
+  PulseTrendData,
   ReactionGroup,
   Topic,
   User,
@@ -468,4 +472,40 @@ export const api = {
     req<CustomEmoji>('/emoji/custom', { method: 'POST', body: JSON.stringify({ name, fileUrl, aliases }) }),
   deleteCustomEmoji: (id: string) =>
     req<{ ok: boolean }>(`/emoji/custom/${id}`, { method: 'DELETE' }),
+
+  // ---------- パルスサーベイ ----------
+  listPulseSurveys: (affiliationId: string, limit?: number, offset?: number) => {
+    const qs = new URLSearchParams();
+    if (limit) qs.set('limit', String(limit));
+    if (offset) qs.set('offset', String(offset));
+    const q = qs.toString();
+    return req<PulseSurveySummary[]>(`/pulse/affiliations/${affiliationId}${q ? '?' + q : ''}`);
+  },
+  getAffiliationCurrentPulse: (affiliationId: string) =>
+    req<PulseSurveySummary | null>(`/pulse/affiliations/${affiliationId}/current`),
+  createPulseSurvey: (affiliationId: string) =>
+    req<PulseSurveySummary>(`/pulse/affiliations/${affiliationId}`, { method: 'POST', body: JSON.stringify({}) }),
+  getPulseSurvey: (id: string) =>
+    req<PulseSurveyDetail>(`/pulse/surveys/${id}`),
+  respondToPulse: (id: string, answers: Record<string, number>, comment?: string) =>
+    req<{ ok: boolean; streak: number }>(`/pulse/surveys/${id}/respond`, {
+      method: 'POST', body: JSON.stringify({ answers, comment }),
+    }),
+  getAffiliationPulseTrends: (affiliationId: string, limit?: number) => {
+    const q = limit ? `?limit=${limit}` : '';
+    return req<PulseTrendData[]>(`/pulse/affiliations/${affiliationId}/trends${q}`);
+  },
+  closePulseSurvey: (id: string) =>
+    req<{ ok: boolean }>(`/pulse/surveys/${id}/close`, { method: 'PATCH' }),
+  getAffiliationMonthlyTrends: (affiliationId: string, limit?: number) => {
+    const q = limit ? `?limit=${limit}` : '';
+    return req<import('./types').PulseMonthlyData[]>(`/pulse/affiliations/${affiliationId}/monthly${q}`);
+  },
+  // 個人スコープ
+  getMyCurrentPulses: () =>
+    req<PulseSurveySummary[]>('/pulse/me/current'),
+  getMyPulseTrends: (limit?: number) => {
+    const q = limit ? `?limit=${limit}` : '';
+    return req<PulseMyTrendItem[]>(`/pulse/me/trends${q}`);
+  },
 };
