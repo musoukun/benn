@@ -3,19 +3,23 @@ import { Link } from 'react-router-dom';
 import { Avatar } from './Avatar';
 import { ReactionBar } from './ReactionBar';
 import { ReactionPicker } from './ReactionPicker';
+import { MentionText } from './MentionText';
 import type { ChatMessage } from '../types';
 import { getRecentEmoji, addRecentEmoji } from '../hooks/useRecentEmoji';
+import { hasMentionForMe } from '../utils/mention';
 
 type Props = {
   message: ChatMessage;
   /** 直前のメッセージと同一著者 & 5分以内ならtrue → アバター・名前を省略 */
   grouped: boolean;
+  /** 自分のユーザーID (自分宛てメンション背景ハイライト用) */
+  myUserId?: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onEdit?: (messageId: string, body: string) => void;
   onDelete?: (messageId: string) => void;
 };
 
-export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, onDelete }: Props) {
+export function ChatMessageItem({ message, grouped, myUserId, onToggleReaction, onEdit, onDelete }: Props) {
   const [showPicker, setShowPicker] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(message.body);
@@ -41,7 +45,7 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
 
   return (
     <div
-      className={`dc-msg${grouped ? ' dc-msg-grouped' : ''}`}
+      className={`dc-msg${grouped ? ' dc-msg-grouped' : ''}${myUserId && hasMentionForMe(message.body, myUserId) ? ' dc-msg-mentioned' : ''}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -89,7 +93,7 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
           </div>
         ) : (
           <div className="dc-msg-text">
-            {message.body}
+            <MentionText text={message.body} />
             {message.editedAt && <span className="dc-msg-edited">(編集済)</span>}
           </div>
         )}
@@ -98,7 +102,6 @@ export function ChatMessageItem({ message, grouped, onToggleReaction, onEdit, on
         <ReactionBar
           reactions={message.reactions}
           onToggle={(emoji) => onToggleReaction(message.id, emoji)}
-          onPickerOpen={() => setShowPicker(true)}
         />
         {showPicker && (
           <ReactionPicker

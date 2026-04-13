@@ -4,8 +4,10 @@ import { api } from '../api';
 import { connectSocket } from '../socket';
 import { useChatRoom } from '../hooks/useChatRoom';
 import { ChatMessageItem, DateSeparator } from '../components/ChatMessageItem';
+import { MentionPicker, getMentionCandidates } from '../components/MentionPicker';
 import { Avatar } from '../components/Avatar';
 import { useMe } from '../useMe';
+import { buildMention } from '../utils/mention';
 import type { ChatRoomFull } from '../types';
 
 export function ChatRoomPage() {
@@ -16,8 +18,12 @@ export function ChatRoomPage() {
   const [inputValue, setInputValue] = useState('');
   const [showMembers, setShowMembers] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(-1);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { connectSocket(); }, []);
@@ -49,15 +55,82 @@ export function ChatRoomPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // --- メンション候補計算 ---
+  const mentionCandidates = (mentionQuery !== null && room)
+    ? getMentionCandidates(room.members, mentionQuery)
+    : [];
+
+  // メンション選択
+  const handleMentionSelect = useCallback((name: string, userId: string) => {
+    const before = inputValue.slice(0, mentionStart);
+    const after = inputValue.slice(mentionStart + 1 + (mentionQuery?.length ?? 0));
+    const mention = buildMention(name, userId);
+    setInputValue(before + mention + ' ' + after);
+    setMentionQuery(null);
+    setMentionStart(-1);
+    setMentionIndex(0);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [inputValue, mentionStart, mentionQuery]);
+
   const handleSend = () => {
     const trimmed = inputValue.trim();
     if (!trimmed) return;
     sendMessage(trimmed);
     setInputValue('');
+    setMentionQuery(null);
+    setMentionStart(-1);
     sendTyping(false);
   };
 
+  // テキストエリアの入力変更 → メンションクエリ検出
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+
+    const pos = e.target.selectionStart ?? val.length;
+    const textBefore = val.slice(0, pos);
+    const atIdx = textBefore.lastIndexOf('@');
+    if (atIdx >= 0) {
+      const charBefore = atIdx > 0 ? textBefore[atIdx - 1] : ' ';
+      const query = textBefore.slice(atIdx + 1);
+      if ((charBefore === ' ' || charBefore === '\n' || atIdx === 0) && !/\s/.test(query)) {
+        setMentionQuery(query);
+        setMentionStart(atIdx);
+        setMentionIndex(0);
+        return;
+      }
+    }
+    setMentionQuery(null);
+    setMentionStart(-1);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // メンションピッカーが表示中はキーボード操作をハイジャック
+    if (mentionQuery !== null && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.min(i + 1, mentionCandidates.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const c = mentionCandidates[mentionIndex];
+        if (c) handleMentionSelect(c.name, c.id);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        setMentionStart(-1);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -120,6 +193,7 @@ export function ChatRoomPage() {
           key={msg.id}
           message={msg}
           grouped={grouped}
+          myUserId={me?.id}
           onToggleReaction={toggleReaction}
           onEdit={msg.isMine ? editMessage : undefined}
           onDelete={msg.isMine || isOwner ? deleteMessage : undefined}
@@ -195,10 +269,21 @@ export function ChatRoomPage() {
 
           {/* 入力 */}
           <div className="dc-input-area">
+            {mentionQuery !== null && mentionCandidates.length > 0 && (
+              <MentionPicker
+                members={room.members}
+                query={mentionQuery}
+                selectedIndex={mentionIndex}
+                onSelect={handleMentionSelect}
+                onHover={(i) => setMentionIndex(i)}
+                onClose={() => { setMentionQuery(null); setMentionStart(-1); }}
+              />
+            )}
             <textarea
+              ref={inputRef}
               className="dc-input"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={`#${room.name} へメッセージを送信`}
               rows={1}
