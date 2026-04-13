@@ -19,8 +19,8 @@ export function ChatRoomPage() {
   const [showMembers, setShowMembers] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStart, setMentionStart] = useState(-1);
-  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStart, setMentionStart] = useState(-1); // @ の位置
+  const [mentionIndex, setMentionIndex] = useState(0); // 選択中のインデックス
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -63,12 +63,13 @@ export function ChatRoomPage() {
   // メンション選択
   const handleMentionSelect = useCallback((name: string, userId: string) => {
     const before = inputValue.slice(0, mentionStart);
-    const after = inputValue.slice(mentionStart + 1 + (mentionQuery?.length ?? 0));
+    const after = inputValue.slice(mentionStart + 1 + (mentionQuery?.length ?? 0)); // @+query 部分を置換
     const mention = buildMention(name, userId);
     setInputValue(before + mention + ' ' + after);
     setMentionQuery(null);
     setMentionStart(-1);
     setMentionIndex(0);
+    // フォーカスを戻す
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [inputValue, mentionStart, mentionQuery]);
 
@@ -88,11 +89,14 @@ export function ChatRoomPage() {
     setInputValue(val);
 
     const pos = e.target.selectionStart ?? val.length;
+    // カーソル位置から逆方向に @ を探す
     const textBefore = val.slice(0, pos);
     const atIdx = textBefore.lastIndexOf('@');
     if (atIdx >= 0) {
+      // @ の前が文字(非空白)ならメンションではない
       const charBefore = atIdx > 0 ? textBefore[atIdx - 1] : ' ';
       const query = textBefore.slice(atIdx + 1);
+      // スペースを含まず、@ の直前が空白 or 行頭ならメンション候補
       if ((charBefore === ' ' || charBefore === '\n' || atIdx === 0) && !/\s/.test(query)) {
         setMentionQuery(query);
         setMentionStart(atIdx);
@@ -193,7 +197,6 @@ export function ChatRoomPage() {
           key={msg.id}
           message={msg}
           grouped={grouped}
-          myUserId={me?.id}
           onToggleReaction={toggleReaction}
           onEdit={msg.isMine ? editMessage : undefined}
           onDelete={msg.isMine || isOwner ? deleteMessage : undefined}
