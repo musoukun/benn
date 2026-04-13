@@ -67,6 +67,11 @@ export function Header() {
             💬 Chat
           </NavLink>
         )}
+        {me && (
+          <NavLink to="/pulse" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+            📊 Pulse
+          </NavLink>
+        )}
         <input
           className="search"
           placeholder="記事 / コミュニティ / 投稿を検索…"

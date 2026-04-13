@@ -55,6 +55,7 @@ export function CommunityPage() {
     // 所属ピッカー用。ログインしていなくても全体リストは公開 API なので OK
     api.listAffiliations().then(setAllAffiliations).catch(() => setAllAffiliations([]));
   }, []);
+
   const meId = me?.id || null;
 
   useEffect(() => {

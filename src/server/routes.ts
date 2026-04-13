@@ -18,6 +18,7 @@ import { adminRoutes } from './routes-admin';
 import { chatRoutes } from './routes-chat';
 import { reactionRoutes } from './routes-reactions';
 import { emojiRoutes } from './routes-emoji';
+import { pulseRoutes } from './routes-pulse';
 import { notify, unnotify } from './notify';
 
 export const api = new Hono<{ Variables: { user: User | null } }>();
@@ -36,6 +37,7 @@ api.route('/admin', adminRoutes);
 api.route('/chat', chatRoutes);
 api.route('/reactions', reactionRoutes);
 api.route('/emoji', emojiRoutes);
+api.route('/pulse', pulseRoutes);
 
 // ---------- file uploads (画像/GIF) ----------
 
