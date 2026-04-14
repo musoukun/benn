@@ -240,8 +240,13 @@ pulseRoutes.get('/surveys/:id', requireAuth, async (c) => {
   });
   if (!survey) return c.json({ error: 'not found' }, 404);
 
-  await requireAffiliationMember(survey.affiliationId, user.id);
-  const memberCount = await prisma.userAffiliation.count({ where: { affiliationId: survey.affiliationId } });
+  // 全社サーベイは誰でも閲覧可能、所属サーベイはメンバーのみ
+  if (survey.affiliationId) {
+    await requireAffiliationMember(survey.affiliationId, user.id);
+  }
+  const memberCount = survey.affiliationId
+    ? await prisma.userAffiliation.count({ where: { affiliationId: survey.affiliationId } })
+    : await prisma.user.count({ where: { isRetired: false } });
 
   const myResponse = await prisma.pulseSurveyResponse.findUnique({
     where: { surveyId_userId: { surveyId: id, userId: user.id } },
@@ -252,7 +257,7 @@ pulseRoutes.get('/surveys/:id', requireAuth, async (c) => {
   return c.json({
     id: survey.id,
     affiliationId: survey.affiliationId,
-    affiliationName: survey.affiliation.name,
+    affiliationName: survey.affiliation?.name || '全社',
     periodLabel: survey.periodLabel,
     status: survey.status,
     responseCount: survey._count.responses,
@@ -275,7 +280,10 @@ pulseRoutes.post('/surveys/:id/respond', requireAuth, async (c) => {
   if (!survey) return c.json({ error: 'not found' }, 404);
   if (survey.status !== 'open') return c.json({ error: 'このサーベイは終了しています' }, 400);
 
-  await requireAffiliationMember(survey.affiliationId, user.id);
+  // 全社サーベイ (affiliationId=null) は誰でも回答可能。所属サーベイはメンバーのみ。
+  if (survey.affiliationId) {
+    await requireAffiliationMember(survey.affiliationId, user.id);
+  }
 
   const body = await c.req.json<{ answers: Record<string, number>; comment?: string }>();
 
@@ -381,13 +389,17 @@ pulseRoutes.get('/me/current', requireAuth, async (c) => {
     select: { affiliationId: true, affiliation: { select: { id: true, name: true, slug: true } } },
   });
 
-  if (myAffs.length === 0) return c.json([]);
-
   const affIds = myAffs.map((a) => a.affiliationId);
 
-  // 全所属の open サーベイを取得
+  // 所属別 open サーベイ + 全社サーベイ (affiliationId=null) を取得
   const openSurveys = await prisma.pulseSurvey.findMany({
-    where: { affiliationId: { in: affIds }, status: 'open' },
+    where: {
+      status: 'open',
+      OR: [
+        ...(affIds.length > 0 ? [{ affiliationId: { in: affIds } }] : []),
+        { affiliationId: null },
+      ],
+    },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { responses: true } } },
   });
@@ -400,12 +412,17 @@ pulseRoutes.get('/me/current', requireAuth, async (c) => {
   const respondedSet = new Set(myResponses.map((r) => r.surveyId));
 
   // 所属メンバー数をまとめて取得
-  const memberCounts = await prisma.userAffiliation.groupBy({
-    by: ['affiliationId'],
-    where: { affiliationId: { in: affIds } },
-    _count: { _all: true },
-  });
+  const memberCounts = affIds.length > 0
+    ? await prisma.userAffiliation.groupBy({
+        by: ['affiliationId'],
+        where: { affiliationId: { in: affIds } },
+        _count: { _all: true },
+      })
+    : [];
   const memberCountMap = new Map(memberCounts.map((r) => [r.affiliationId, r._count._all]));
+
+  // 全社サーベイ用: 全ユーザー数
+  const totalUsers = await prisma.user.count({ where: { isRetired: false } });
 
   const affMap = new Map(myAffs.map((a) => [a.affiliationId, a.affiliation]));
 
@@ -413,11 +430,11 @@ pulseRoutes.get('/me/current', requireAuth, async (c) => {
     openSurveys.map((s) => ({
       id: s.id,
       affiliationId: s.affiliationId,
-      affiliationName: affMap.get(s.affiliationId)?.name || '',
+      affiliationName: s.affiliationId ? (affMap.get(s.affiliationId)?.name || '') : '全社',
       periodLabel: s.periodLabel,
       status: s.status,
       responseCount: s._count.responses,
-      memberCount: memberCountMap.get(s.affiliationId) || 0,
+      memberCount: s.affiliationId ? (memberCountMap.get(s.affiliationId) || 0) : totalUsers,
       opensAt: s.opensAt.toISOString(),
       closesAt: s.closesAt.toISOString(),
       myResponseExists: respondedSet.has(s.id),
@@ -460,7 +477,7 @@ pulseRoutes.get('/me/trends', requireAuth, async (c) => {
         : 0;
       return {
         periodLabel: r.survey.periodLabel,
-        affiliationName: r.survey.affiliation.name,
+        affiliationName: r.survey.affiliation?.name || '全社',
         dimensions,
         overall,
         createdAt: r.createdAt.toISOString(),
@@ -508,6 +525,130 @@ pulseRoutes.get('/affiliations/:affiliationId/monthly', requireAuth, async (c) =
       const { dimensions, overall } = computeAggregates(allResponses);
       const totalResponses = monthSurveys.reduce((acc, s) => acc + s._count.responses, 0);
       const totalPossible = monthSurveys.length * memberCount;
+      return {
+        month,
+        weekCount: monthSurveys.length,
+        dimensions,
+        overall,
+        responseRate: totalPossible > 0 ? Math.round((totalResponses / totalPossible) * 100) : 0,
+        responseCount: totalResponses,
+      };
+    });
+
+  return c.json(months);
+});
+
+// ============================================================
+// 全社エンドポイント
+// ============================================================
+
+/** POST /pulse/company — 全社サーベイ作成 (管理者のみ) */
+pulseRoutes.post('/company', requireAuth, async (c) => {
+  const user = c.var.user!;
+  requireAdmin(user);
+
+  const now = new Date();
+  const periodLabel = getISOWeek(now);
+  const closesAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  // affiliationId=null + periodLabel で重複チェック
+  const existing = await prisma.pulseSurvey.findFirst({
+    where: { affiliationId: null, periodLabel },
+  });
+  if (existing) {
+    return c.json({ error: 'この週の全社サーベイは既に存在します', existingId: existing.id }, 409);
+  }
+
+  const survey = await prisma.pulseSurvey.create({
+    data: { affiliationId: null, createdById: user.id, periodLabel, closesAt },
+  });
+  const totalUsers = await prisma.user.count({ where: { isRetired: false } });
+
+  return c.json({
+    id: survey.id,
+    affiliationId: null,
+    affiliationName: '全社',
+    periodLabel: survey.periodLabel,
+    status: survey.status,
+    responseCount: 0,
+    memberCount: totalUsers,
+    opensAt: survey.opensAt.toISOString(),
+    closesAt: survey.closesAt.toISOString(),
+    createdAt: survey.createdAt.toISOString(),
+  }, 201);
+});
+
+/** GET /pulse/company/weekly — 全社週次集計 (全サーベイの回答を periodLabel でグルーピング) */
+pulseRoutes.get('/company/weekly', requireAuth, async (c) => {
+  const limit = Math.min(Number(c.req.query('limit')) || 12, 52);
+
+  const surveys = await prisma.pulseSurvey.findMany({
+    orderBy: { createdAt: 'asc' },
+    include: {
+      responses: { select: { answers: true } },
+      _count: { select: { responses: true } },
+    },
+  });
+
+  const totalUsers = await prisma.user.count({ where: { isRetired: false } });
+
+  // periodLabel ごとに全所属の回答をまとめる
+  const weekMap = new Map<string, { responses: { answers: string }[]; responseCount: number }>();
+  for (const s of surveys) {
+    const key = s.periodLabel;
+    if (!weekMap.has(key)) weekMap.set(key, { responses: [], responseCount: 0 });
+    const entry = weekMap.get(key)!;
+    entry.responses.push(...s.responses);
+    entry.responseCount += s._count.responses;
+  }
+
+  const weeks = Array.from(weekMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-limit)
+    .map(([periodLabel, { responses, responseCount }]) => {
+      const { dimensions, overall } = computeAggregates(responses);
+      return {
+        periodLabel,
+        dimensions,
+        overall,
+        responseRate: totalUsers > 0 ? Math.round((responseCount / totalUsers) * 100) : 0,
+        responseCount,
+      };
+    });
+
+  return c.json(weeks);
+});
+
+/** GET /pulse/company/monthly — 全社月次集計 */
+pulseRoutes.get('/company/monthly', requireAuth, async (c) => {
+  const limit = Math.min(Number(c.req.query('limit')) || 12, 24);
+
+  const surveys = await prisma.pulseSurvey.findMany({
+    orderBy: { createdAt: 'asc' },
+    include: {
+      responses: { select: { answers: true } },
+      _count: { select: { responses: true } },
+    },
+  });
+
+  const totalUsers = await prisma.user.count({ where: { isRetired: false } });
+
+  // 月別にグルーピング
+  const monthMap = new Map<string, typeof surveys>();
+  for (const s of surveys) {
+    const month = s.opensAt.toISOString().slice(0, 7);
+    if (!monthMap.has(month)) monthMap.set(month, []);
+    monthMap.get(month)!.push(s);
+  }
+
+  const months = Array.from(monthMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-limit)
+    .map(([month, monthSurveys]) => {
+      const allResponses = monthSurveys.flatMap((s) => s.responses);
+      const { dimensions, overall } = computeAggregates(allResponses);
+      const totalResponses = monthSurveys.reduce((acc, s) => acc + s._count.responses, 0);
+      const totalPossible = monthSurveys.length * totalUsers;
       return {
         month,
         weekCount: monthSurveys.length,

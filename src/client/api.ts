@@ -499,4 +499,15 @@ export const api = {
     const q = limit ? `?limit=${limit}` : '';
     return req<PulseMyTrendItem[]>(`/pulse/me/trends${q}`);
   },
+  // 全社
+  createCompanyPulseSurvey: () =>
+    req<PulseSurveySummary>('/pulse/company', { method: 'POST', body: JSON.stringify({}) }),
+  getCompanyWeeklyPulse: (limit?: number) => {
+    const q = limit ? `?limit=${limit}` : '';
+    return req<import('./types').PulseTrendData[]>(`/pulse/company/weekly${q}`);
+  },
+  getCompanyMonthlyPulse: (limit?: number) => {
+    const q = limit ? `?limit=${limit}` : '';
+    return req<import('./types').PulseMonthlyData[]>(`/pulse/company/monthly${q}`);
+  },
 };

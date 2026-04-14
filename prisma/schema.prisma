@@ -568,8 +568,9 @@ model GoogleOAuthToken {
 
 model PulseSurvey {
   id            String   @id @default(cuid())
-  affiliationId String
-  affiliation   Affiliation @relation(fields: [affiliationId], references: [id], onDelete: Cascade)
+  // null = 全社サーベイ (所属なしユーザー用)
+  affiliationId String?
+  affiliation   Affiliation? @relation(fields: [affiliationId], references: [id], onDelete: Cascade)
   createdById   String
   // "weekly_2026-W16" のような識別子 (冪等な自動生成用の重複防止キー)
   periodLabel   String

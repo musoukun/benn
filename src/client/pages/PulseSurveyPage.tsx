@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ClipboardCheck, BarChart3, TrendingUp, Plus, Lock, CheckCircle, ChevronRight,
+  ClipboardCheck, BarChart3, TrendingUp, Plus, Lock, CheckCircle, ChevronRight, Building2,
 } from 'lucide-react';
 import { api, ApiError } from '../api';
 import { useMe } from '../useMe';
@@ -13,9 +13,10 @@ import type {
   PulseSurveyDetail,
   PulseTrendData,
   PulseMyTrendItem,
+  PulseMonthlyData,
 } from '../types';
 
-type Tab = 'my' | 'personal' | 'affiliation';
+type Tab = 'my' | 'personal' | 'affiliation' | 'company';
 
 export function PulseSurveyPage() {
   const me = useMe();
@@ -38,6 +39,11 @@ export function PulseSurveyPage() {
   // 個人トレンド
   const [myTrends, setMyTrends] = useState<PulseMyTrendItem[]>([]);
 
+  // 全社
+  const [companyView, setCompanyView] = useState<'weekly' | 'monthly'>('weekly');
+  const [companyWeekly, setCompanyWeekly] = useState<PulseTrendData[]>([]);
+  const [companyMonthly, setCompanyMonthly] = useState<PulseMonthlyData[]>([]);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   // 自分の所属取得
@@ -57,6 +63,14 @@ export function PulseSurveyPage() {
   useEffect(() => {
     if (tab === 'personal') {
       api.getMyPulseTrends(24).then(setMyTrends).catch(() => setMyTrends([]));
+    }
+  }, [tab]);
+
+  // 全社データ読み込み
+  useEffect(() => {
+    if (tab === 'company') {
+      api.getCompanyWeeklyPulse(12).then(setCompanyWeekly).catch(() => setCompanyWeekly([]));
+      api.getCompanyMonthlyPulse(12).then(setCompanyMonthly).catch(() => setCompanyMonthly([]));
     }
   }, [tab]);
 
@@ -91,6 +105,17 @@ export function PulseSurveyPage() {
       loadMySurveys();
     } catch (e: any) {
       if (e instanceof ApiError && e.status === 409) showToast('この週のサーベイは既に存在します');
+      else showToast('作成に失敗しました');
+    }
+  };
+
+  const handleCreateCompany = async () => {
+    try {
+      await api.createCompanyPulseSurvey();
+      showToast('全社サーベイを作成しました');
+      loadMySurveys();
+    } catch (e: any) {
+      if (e instanceof ApiError && e.status === 409) showToast('この週の全社サーベイは既に存在します');
       else showToast('作成に失敗しました');
     }
   };
@@ -133,6 +158,9 @@ export function PulseSurveyPage() {
         <button className={tab === 'affiliation' ? 'active' : ''} onClick={() => setTab('affiliation')}>
           <BarChart3 size={16} /> 所属別結果
         </button>
+        <button className={tab === 'company' ? 'active' : ''} onClick={() => setTab('company')}>
+          <Building2 size={16} /> 全社
+        </button>
       </div>
 
       <div className="pulse-content">
@@ -140,10 +168,13 @@ export function PulseSurveyPage() {
         {tab === 'my' && (
           <>
             {/* 管理者: サーベイ作成 */}
-            {me.isAdmin && affiliations.length > 0 && (
+            {me.isAdmin && (
               <div className="card pulse-admin-card">
                 <h3>サーベイを作成</h3>
                 <div className="pulse-admin-actions">
+                  <button className="btn-ghost" onClick={handleCreateCompany}>
+                    <Plus size={14} /> 全社
+                  </button>
                   {affiliations.map((a) => (
                     <button key={a.id} className="btn-ghost" onClick={() => handleCreate(a.id)}>
                       <Plus size={14} /> {a.name}
@@ -311,6 +342,49 @@ export function PulseSurveyPage() {
                   </div>
                 )}
               </>
+            )}
+          </>
+        )}
+        {/* ======== 全社タブ ======== */}
+        {tab === 'company' && (
+          <>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <button
+                className={companyView === 'weekly' ? 'btn' : 'btn-ghost'}
+                onClick={() => setCompanyView('weekly')}
+              >
+                週次
+              </button>
+              <button
+                className={companyView === 'monthly' ? 'btn' : 'btn-ghost'}
+                onClick={() => setCompanyView('monthly')}
+              >
+                月次
+              </button>
+            </div>
+
+            {companyView === 'weekly' && (
+              companyWeekly.length === 0 ? (
+                <div className="empty">まだ集計データがありません。サーベイを作成して回答を集めてください。</div>
+              ) : (
+                <PulseSurveyTrends trends={companyWeekly} />
+              )
+            )}
+
+            {companyView === 'monthly' && (
+              companyMonthly.length === 0 ? (
+                <div className="empty">まだ月次データがありません。</div>
+              ) : (
+                <PulseSurveyTrends
+                  trends={companyMonthly.map((m) => ({
+                    periodLabel: m.month,
+                    dimensions: m.dimensions,
+                    overall: m.overall,
+                    responseRate: m.responseRate,
+                    responseCount: m.responseCount,
+                  }))}
+                />
+              )
             )}
           </>
         )}
