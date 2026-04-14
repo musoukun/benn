@@ -186,6 +186,109 @@ adminRoutes.delete('/affiliations/:id', requireAdmin, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- 所属マスタ一覧 (管理者) ----
+adminRoutes.get('/affiliations', requireAdmin, async (c) => {
+  const items = await prisma.affiliation.findMany({ orderBy: { createdAt: 'asc' } });
+  return c.json(items);
+});
+
+// ============================================================
+// パルスサーベイ管理
+// ============================================================
+
+function getISOWeek(d: Date): string {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  dt.setUTCDate(dt.getUTCDate() + 4 - (dt.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `weekly_${dt.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// ---- サーベイ一覧 (全件) ----
+adminRoutes.get('/pulse/surveys', requireAdmin, async (c) => {
+  const surveys = await prisma.pulseSurvey.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    include: {
+      _count: { select: { responses: true } },
+      affiliation: { select: { id: true, name: true } },
+    },
+  });
+  const totalUsers = await prisma.user.count({ where: { isRetired: false } });
+  const affCounts = await prisma.userAffiliation.groupBy({
+    by: ['affiliationId'],
+    _count: { _all: true },
+  });
+  const affCountMap = new Map(affCounts.map((r) => [r.affiliationId, r._count._all]));
+
+  return c.json(
+    surveys.map((s) => ({
+      id: s.id,
+      affiliationId: s.affiliationId,
+      affiliationName: s.affiliation?.name ?? '全社',
+      periodLabel: s.periodLabel,
+      status: s.status,
+      responseCount: s._count.responses,
+      memberCount: s.affiliationId ? (affCountMap.get(s.affiliationId) ?? 0) : totalUsers,
+      opensAt: s.opensAt.toISOString(),
+      closesAt: s.closesAt.toISOString(),
+      createdAt: s.createdAt.toISOString(),
+    }))
+  );
+});
+
+// ---- 全社サーベイ作成 ----
+adminRoutes.post('/pulse/surveys/company', requireAdmin, async (c) => {
+  const now = new Date();
+  const periodLabel = getISOWeek(now);
+  const closesAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const existing = await prisma.pulseSurvey.findFirst({
+    where: { affiliationId: null, periodLabel },
+  });
+  if (existing) {
+    return c.json({ error: 'この週の全社サーベイは既に存在します', existingId: existing.id }, 409);
+  }
+
+  const survey = await prisma.pulseSurvey.create({
+    data: { affiliationId: null, periodLabel, closesAt },
+  });
+  return c.json({ id: survey.id, periodLabel: survey.periodLabel }, 201);
+});
+
+// ---- 所属サーベイ作成 ----
+adminRoutes.post('/pulse/surveys/affiliations/:affiliationId', requireAdmin, async (c) => {
+  const { affiliationId } = c.req.param();
+  const aff = await prisma.affiliation.findUnique({ where: { id: affiliationId } });
+  if (!aff) return c.json({ error: '所属が見つかりません' }, 404);
+
+  const now = new Date();
+  const periodLabel = getISOWeek(now);
+  const closesAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const existing = await prisma.pulseSurvey.findUnique({
+    where: { affiliationId_periodLabel: { affiliationId, periodLabel } },
+  });
+  if (existing) {
+    return c.json({ error: 'この週のサーベイは既に存在します', existingId: existing.id }, 409);
+  }
+
+  const survey = await prisma.pulseSurvey.create({
+    data: { affiliationId, periodLabel, closesAt },
+  });
+  return c.json({ id: survey.id, periodLabel: survey.periodLabel }, 201);
+});
+
+// ---- サーベイクローズ ----
+adminRoutes.patch('/pulse/surveys/:id/close', requireAdmin, async (c) => {
+  const { id } = c.req.param();
+  const survey = await prisma.pulseSurvey.findUnique({ where: { id } });
+  if (!survey) return c.json({ error: 'not found' }, 404);
+  if (survey.status === 'closed') return c.json({ error: '既にクローズされています' }, 400);
+  await prisma.pulseSurvey.update({ where: { id }, data: { status: 'closed' } });
+  return c.json({ ok: true });
+});
+
 // ============================================================
 // 管理者招待
 // ============================================================

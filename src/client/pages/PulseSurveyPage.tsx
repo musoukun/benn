@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ClipboardCheck, BarChart3, TrendingUp, Plus, Lock, CheckCircle, ChevronRight, Building2,
+  ClipboardCheck, BarChart3, TrendingUp, CheckCircle, ChevronRight, Building2,
 } from 'lucide-react';
-import { api, ApiError } from '../api';
+import { api } from '../api';
 import { useMe } from '../useMe';
 import { PulseSurveyForm } from '../components/PulseSurveyForm';
 import { PulseSurveyResults } from '../components/PulseSurveyResults';
@@ -98,38 +98,6 @@ export function PulseSurveyPage() {
     loadMySurveys();
   };
 
-  const handleCreate = async (affiliationId: string) => {
-    try {
-      await api.createPulseSurvey(affiliationId);
-      showToast('新しいサーベイを作成しました');
-      loadMySurveys();
-    } catch (e: any) {
-      if (e instanceof ApiError && e.status === 409) showToast('この週のサーベイは既に存在します');
-      else showToast('作成に失敗しました');
-    }
-  };
-
-  const handleCreateCompany = async () => {
-    try {
-      await api.createCompanyPulseSurvey();
-      showToast('全社サーベイを作成しました');
-      loadMySurveys();
-    } catch (e: any) {
-      if (e instanceof ApiError && e.status === 409) showToast('この週の全社サーベイは既に存在します');
-      else showToast('作成に失敗しました');
-    }
-  };
-
-  const handleClose = async (surveyId: string) => {
-    try {
-      await api.closePulseSurvey(surveyId);
-      showToast('サーベイをクローズしました');
-      loadMySurveys();
-    } catch {
-      showToast('クローズに失敗しました');
-    }
-  };
-
   const viewResult = async (surveyId: string) => {
     try {
       const d = await api.getPulseSurvey(surveyId);
@@ -167,23 +135,6 @@ export function PulseSurveyPage() {
         {/* ======== マイサーベイタブ ======== */}
         {tab === 'my' && (
           <>
-            {/* 管理者: サーベイ作成 */}
-            {me.isAdmin && (
-              <div className="card pulse-admin-card">
-                <h3>サーベイを作成</h3>
-                <div className="pulse-admin-actions">
-                  <button className="btn-ghost" onClick={handleCreateCompany}>
-                    <Plus size={14} /> 全社
-                  </button>
-                  {affiliations.map((a) => (
-                    <button key={a.id} className="btn-ghost" onClick={() => handleCreate(a.id)}>
-                      <Plus size={14} /> {a.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* 回答フォーム表示中 */}
             {activeSurveyId && (
               <div className="card">
@@ -208,13 +159,12 @@ export function PulseSurveyPage() {
             {/* サーベイ一覧 */}
             {!activeSurveyId && !affDetail && (
               <>
-                {mySurveys.length === 0 && affiliations.length === 0 ? (
-                  <div className="card pulse-no-survey">
-                    <p>所属が設定されていません。管理者に所属の設定を依頼してください。</p>
-                  </div>
-                ) : mySurveys.length === 0 ? (
+                {mySurveys.length === 0 ? (
                   <div className="card pulse-no-survey">
                     <p>現在オープンなサーベイはありません。</p>
+                    <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
+                      管理者が新しいサーベイを開始するまでお待ちください。
+                    </p>
                   </div>
                 ) : (
                   <div className="pulse-survey-list">
@@ -245,11 +195,6 @@ export function PulseSurveyPage() {
                           ) : (
                             <button className="btn" onClick={() => setActiveSurveyId(s.id)}>
                               回答する <ChevronRight size={14} />
-                            </button>
-                          )}
-                          {me.isAdmin && (
-                            <button className="btn-ghost btn-danger-text" onClick={() => handleClose(s.id)}>
-                              <Lock size={14} /> クローズ
                             </button>
                           )}
                         </div>

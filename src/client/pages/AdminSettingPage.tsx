@@ -115,7 +115,7 @@ function AdminInitForm({ onCreated }: { onCreated: () => void }) {
 
 // ---------- ダッシュボード ----------
 
-type Tab = 'users' | 'admins' | 'affiliations';
+type Tab = 'users' | 'admins' | 'affiliations' | 'pulse';
 
 function AdminDashboard({ admin }: { admin: AdminUser }) {
   const [tab, setTab] = useState<Tab>('users');
@@ -138,10 +138,12 @@ function AdminDashboard({ admin }: { admin: AdminUser }) {
         <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>ユーザ管理</button>
         <button className={tab === 'admins' ? 'active' : ''} onClick={() => setTab('admins')}>管理者</button>
         <button className={tab === 'affiliations' ? 'active' : ''} onClick={() => setTab('affiliations')}>所属マスタ</button>
+        <button className={tab === 'pulse' ? 'active' : ''} onClick={() => setTab('pulse')}>パルスサーベイ</button>
       </div>
       {tab === 'users' && <AdminUsersSection />}
       {tab === 'admins' && <AdminAdminsSection />}
       {tab === 'affiliations' && <AdminAffiliationsSection />}
+      {tab === 'pulse' && <AdminPulseSection />}
     </div>
   );
 }
@@ -554,5 +556,142 @@ function AdminAffiliationsSection() {
         ))}
       </ul>
     </div>
+  );
+}
+
+// ---------- パルスサーベイ管理 ----------
+
+type AdminPulseSurvey = {
+  id: string;
+  affiliationId: string | null;
+  affiliationName: string;
+  periodLabel: string;
+  status: string;
+  responseCount: number;
+  memberCount: number;
+  opensAt: string;
+  closesAt: string;
+  createdAt: string;
+};
+
+function AdminPulseSection() {
+  const [surveys, setSurveys] = useState<AdminPulseSurvey[]>([]);
+  const [affs, setAffs] = useState<Affiliation[]>([]);
+  const [pickedAff, setPickedAff] = useState<string>('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = async () => {
+    const [s, a] = await Promise.all([api.adminListPulseSurveys(), api.adminListAffiliations()]);
+    setSurveys(s);
+    setAffs(a);
+    if (!pickedAff && a.length > 0) setPickedAff(a[0].id);
+  };
+  useEffect(() => { reload().catch(() => {}); }, []);
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(() => setMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [msg]);
+
+  const createCompany = async () => {
+    setBusy(true);
+    try {
+      await api.adminCreateCompanyPulseSurvey();
+      setMsg('全社サーベイを作成しました');
+      reload();
+    } catch (e: any) {
+      if (e?.status === 409) setMsg('この週の全社サーベイは既に存在します');
+      else setMsg(e instanceof Error ? e.message : '作成に失敗しました');
+    } finally { setBusy(false); }
+  };
+
+  const createAff = async () => {
+    if (!pickedAff) return;
+    setBusy(true);
+    try {
+      await api.adminCreateAffiliationPulseSurvey(pickedAff);
+      setMsg('所属サーベイを作成しました');
+      reload();
+    } catch (e: any) {
+      if (e?.status === 409) setMsg('この週のサーベイは既に存在します');
+      else setMsg(e instanceof Error ? e.message : '作成に失敗しました');
+    } finally { setBusy(false); }
+  };
+
+  const close = async (id: string) => {
+    if (!confirm('このサーベイをクローズしますか?')) return;
+    try {
+      await api.adminClosePulseSurvey(id);
+      setMsg('クローズしました');
+      reload();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '失敗しました');
+    }
+  };
+
+  return (
+    <>
+      {msg && <div className="toast" role="status">{msg}</div>}
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>サーベイを作成</h3>
+        <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0 }}>
+          週次サーベイを開始します。同じ週で既に作成済みの場合は重複作成できません。
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <button className="btn" onClick={createCompany} disabled={busy}>
+            全社サーベイを開始
+          </button>
+          <span style={{ color: 'var(--muted)' }}>|</span>
+          <select
+            value={pickedAff}
+            onChange={(e) => setPickedAff(e.target.value)}
+            disabled={affs.length === 0}
+          >
+            {affs.length === 0 && <option value="">所属が未登録です</option>}
+            {affs.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+          <button className="btn btn-ghost" onClick={createAff} disabled={busy || !pickedAff}>
+            所属サーベイを開始
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>サーベイ一覧</h3>
+        {surveys.length === 0 ? (
+          <p style={{ color: 'var(--muted)' }}>まだサーベイはありません。</p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {surveys.map((s) => (
+              <li key={s.id} style={{
+                display: 'flex', flexWrap: 'wrap', gap: 12, padding: '12px 0',
+                borderBottom: '1px solid var(--border)', alignItems: 'center',
+              }}>
+                <span className="tag" style={{ minWidth: 90 }}>
+                  {s.affiliationName}
+                </span>
+                <span style={{ fontSize: 14 }}>{s.periodLabel}</span>
+                <span className={`pulse-status pulse-status-${s.status}`} style={{ fontSize: 12 }}>
+                  {s.status === 'open' ? 'オープン' : 'クローズ'}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                  回答 {s.responseCount}/{s.memberCount}
+                </span>
+                <span style={{ flex: 1 }} />
+                {s.status === 'open' && (
+                  <button className="btn btn-ghost" onClick={() => close(s.id)}>
+                    クローズ
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }

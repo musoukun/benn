@@ -426,6 +426,36 @@ export const api = {
   adminUnretireUser: (id: string) =>
     req<{ ok: boolean }>(`/admin/users/${id}/unretire`, { method: 'POST', body: JSON.stringify({}) }),
 
+  // ---- admin: パルスサーベイ管理 ----
+  adminListAffiliations: () => req<Affiliation[]>('/admin/affiliations'),
+  adminListPulseSurveys: () =>
+    req<
+      Array<{
+        id: string;
+        affiliationId: string | null;
+        affiliationName: string;
+        periodLabel: string;
+        status: string;
+        responseCount: number;
+        memberCount: number;
+        opensAt: string;
+        closesAt: string;
+        createdAt: string;
+      }>
+    >('/admin/pulse/surveys'),
+  adminCreateCompanyPulseSurvey: () =>
+    req<{ id: string; periodLabel: string }>('/admin/pulse/surveys/company', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  adminCreateAffiliationPulseSurvey: (affiliationId: string) =>
+    req<{ id: string; periodLabel: string }>(
+      `/admin/pulse/surveys/affiliations/${affiliationId}`,
+      { method: 'POST', body: JSON.stringify({}) }
+    ),
+  adminClosePulseSurvey: (id: string) =>
+    req<{ ok: boolean }>(`/admin/pulse/surveys/${id}/close`, { method: 'PATCH' }),
+
   // チャット
   listChatRooms: () => req<ChatRoomSummary[]>('/chat/rooms'),
   listPublicRooms: (q?: string) =>
